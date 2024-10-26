@@ -161,25 +161,6 @@ check_super_device_size() {
 		abort "! Super block device size mismatch!"
 }
 
-is_oss_kernel_rom() {
-	local m16t_touch_node m16t_touch_prop ir_spi_node ir_spi_prop
-
-	[ -f /vendor/bin/sensor-notifier ] && return 0
-
-	# Check if it's new OSS dtbo
-	# https://github.com/cupid-development/android_kernel_xiaomi_sm8450-devicetrees/commit/f4dfb9210dc907b335441bfa78720773f679f841
-	m16t_touch_node=$(find /proc/device-tree/ | grep -E -m1 '/m16t-touch.*/compatible$') && \
-		m16t_touch_prop=$(cat "$m16t_touch_node") && \
-			test "$m16t_touch_prop" == "goodix,9916r-spi" || return 0
-
-	# https://github.com/cupid-development/android_kernel_xiaomi_sm8450-devicetrees/commit/393374ee4d02edbc27f3b6b57b965a7fbe87d33b
-	ir_spi_node=$(find /proc/device-tree/ | grep -E -m1 '/ir-spi.*/compatible$') && \
-		ir_spi_prop=$(cat "$ir_spi_node") && \
-			test "$ir_spi_prop" == "ir-spi-led" && return 0
-
-	return 1
-}
-
 # Check firmware
 if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'; then
 	ui_print "HyperOS firmware detected!"
@@ -190,7 +171,6 @@ else
 fi
 
 # Check rom type
-is_oss_kernel_rom && abort "Error: Melt Kernel does not seem to support your rom:/"
 is_miui_rom=false
 [ -f /system/framework/MiuiBooster.jar ] && is_miui_rom=true
 
@@ -243,10 +223,6 @@ rm ${home}/Image.7z
 is_mounted /vendor_dlkm || \
 	mount /vendor_dlkm -o ro || mount /dev/block/mapper/vendor_dlkm${slot} /vendor_dlkm -o ro || \
 		abort "! Failed to mount /vendor_dlkm"
-
-# Btw, determine again whether it is a ROM based on the OSS kernel
-strings /vendor_dlkm/lib/modules/cnss2.ko | grep -q 'clang version 12.0.5' || \
-	abort "Error: Melt Kernel does not seem to support your rom:/"
 
 strings ${home}/Image 2>/dev/null | grep -E -m1 'Linux version.*#' > ${home}/vertmp
 
@@ -364,16 +340,28 @@ unset modname_qti_battery_charger qti_battery_charger_mod_options
 
 # OSS msm_drm.ko
 if ${is_hyperos_fw}; then
-	if keycode_select \
-	    "Using open source display drivers?" \
-	    " " \
-	    "Note:" \
-	    "Select No if you don't know what this means."; then
+	use_oss_msm_drm=false
+	skip_option_oss_msm_drm=false
+	if [ -f /vendor/bin/sensor-notifier ]; then
+		use_oss_msm_drm=true
+		skip_option_oss_msm_drm=true
+	fi
+	if ! ${skip_option_oss_msm_drm}; then
+		if keycode_select \
+		    "Using open source display drivers?" \
+		    " " \
+		    "Note:" \
+		    "Select No if you don't know what this means."; then
+			use_oss_msm_drm=true
+		fi
+	fi
+	if ${use_oss_msm_drm}; then
 		oss_msm_drm=${home}/_alt/OSS-msm_drm.ko
 		[ -f $oss_msm_drm ] || abort "! Cannot found ${oss_msm_drm}!"
 		cp $oss_msm_drm ${home}/_vendor_dlkm_modules/msm_drm.ko -f
 		unset oss_msm_drm
 	fi
+	unset use_oss_msm_drm skip_option_oss_msm_drm
 fi
 
 # Alternative wired headset buttons mode
@@ -398,6 +386,31 @@ if ${use_wired_btn_altmode}; then
 fi
 unset use_wired_btn_altmode skip_option_wired_btn_altmode
 
+# Correct physical panel dimensions
+fix_panel_dimension=false
+skip_option_fix_panel_dimension=false
+if ${is_miui_rom} || cat /system/build.prop | grep -qi 'aospa'; then
+	skip_option_fix_panel_dimension=true
+fi
+if ! ${skip_option_fix_panel_dimension}; then
+	if keycode_select \
+	    "Correct physical panel dimensions?" \
+	    " " \
+	    "Note:" \
+	    "Select Yes if you are using a ROM based on" \
+	    "the OSS kernel and find that the buttons of" \
+	    "MIUI camera app are too small." \
+	    "Select No if you are using MIUI, HyperOS," \
+	    "or AOSPA rom." \
+	    " " \
+	    "WARNING:" \
+	    "Selecting the wrong option may cause the" \
+	    "touchscreen to not operate properly!"; then
+		fix_panel_dimension=true
+	fi
+fi
+unset skip_option_fix_panel_dimension
+
 unset vendor_dlkm_modules_options_file
 
 # Do not load millet related modules in AOSP rom
@@ -421,27 +434,31 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 		ui_print "- It looks like you are installing Melt Kernel for the first time."
 
 		if keycode_select "Backup the current kernel?"; then
-			ui_print "- Backing up kernel, vendor_boot, and vendor_dlkm partition..."
+			ui_print "- Backing up kernel, vendor_boot, vendor_dlkm"
+			ui_print "  and dtbo partition..."
 
 			backup_package=/sdcard/Melt-restore-kernel-$(file_getprop /system/build.prop ro.build.version.incremental)-$(date +"%Y%m%d-%H%M%S").zip
 
-			dd if=/dev/block/bootdevice/by-name/vendor_boot${slot} of=${home}/vendor_boot.img
-
 			${bin}/7za a -tzip -bd $backup_package \
 				${home}/META-INF ${bin} ${home}/LICENSE ${home}/_restore_anykernel.sh \
-				${split_img}/kernel ${home}/vendor_dlkm.img ${home}/vendor_boot.img
+				${split_img}/kernel \
+				${home}/vendor_dlkm.img \
+				/dev/block/bootdevice/by-name/vendor_boot${slot} \
+				/dev/block/bootdevice/by-name/dtbo${slot}
 			${bin}/7za rn -bd $backup_package kernel Image
 			${bin}/7za rn -bd $backup_package _restore_anykernel.sh anykernel.sh
+			${bin}/7za rn -bd $backup_package vendor_boot${slot} vendor_boot.img
+			${bin}/7za rn -bd $backup_package dtbo${slot} dtbo.img
 			sync
 
 			ui_print " "
-			ui_print "- The current kernel, vendor_boot, vendor_dlkm have been backedup to:"
+			ui_print "- The current kernel, vendor_boot, vendor_dlkm"
+			ui_print "  and dtbo have been backedup to:"
 			ui_print "  $backup_package"
 			ui_print "- If you encounter an unexpected situation,"
 			ui_print "  or want to restore the stock kernel,"
 			ui_print "  please flash it in TWRP or some supported apps."
 			ui_print " "
-			rm ${home}/vendor_boot.img
 			touch ${home}/do_backup_flag
 
 			if ! $BOOTMODE && [ ! -d /twres ]; then
@@ -581,14 +598,25 @@ no_magisk_check=true
 reset_ak
 
 # vendor_boot install
-dump_boot # use split_boot to skip ramdisk unpack, e.g. for devices with init_boot ramdisk
+dump_boot
 
 vendor_boot_modules_dir=${ramdisk}/lib/modules
 rm ${vendor_boot_modules_dir}/*
 cp ${home}/_vendor_boot_modules/* ${vendor_boot_modules_dir}/
 set_perm 0 0 0644 ${vendor_boot_modules_dir}/*
 
-write_boot # use flash_boot to skip ramdisk repack, e.g. for devices with init_boot ramdisk
+${bin}/7za x ${home}/_dtb.7z -o${home}/ || abort "! Failed to unpack _dtb.7z!"
+
+if ${fix_panel_dimension}; then
+	mv ${home}/dtbo-1.img ${home}/dtbo.img
+	rm ${home}/dtbo-0.img
+else
+	mv ${home}/dtbo-0.img ${home}/dtbo.img
+	rm ${home}/dtbo-1.img
+fi
+unset fix_panel_dimension
+
+write_boot  # Since dtbo.img exists in ${home}, the dtbo partition will also be flashed at this time
 
 ########## FLASH VENDOR_BOOT END ##########
 
