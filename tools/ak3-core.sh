@@ -161,6 +161,9 @@ unpack_ramdisk() {
   if [ -f ramdisk.cpio ]; then
     comp=$($bin/magiskboot decompress ramdisk.cpio 2>&1 | grep -v 'raw' | sed -n 's;.*\[\(.*\)\];\1;p');
   elif [ -d vendor_ramdisk ]; then
+    # If the vendor_ramdisk directory exists, it means that the image was unpacked by magiskboot,
+    # and the cpio archive files must have been decompressed during the unpacking process.
+    # Therefore, we skip setting the `comp` variable here, and we don't need to determine the compression algorithm.
     if [ ! -f vendor_ramdisk/ramdisk.cpio ]; then
       abort "Unsupported ramdisk file format. Aborting...";
     fi;

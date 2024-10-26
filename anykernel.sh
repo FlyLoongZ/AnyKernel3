@@ -256,13 +256,13 @@ ${bin}/7za x ${home}/Image.7z -o${home}/ && [ -f ${home}/Image ] || abort "! Fai
 rm ${home}/Image.7z
 [ "$(sha1 ${home}/Image)" == "$SHA1_STOCK" ] || abort "! Kernel image is corrupted!"
 
+strings ${home}/Image 2>/dev/null | grep -E -m1 'Linux version.*#' > ${home}/vertmp
+
 # Check vendor_dlkm partition status
 [ -d /vendor_dlkm ] || mkdir /vendor_dlkm
 is_mounted /vendor_dlkm || \
 	mount /vendor_dlkm -o ro || mount /dev/block/mapper/vendor_dlkm${slot} /vendor_dlkm -o ro || \
 		abort "! Failed to mount /vendor_dlkm"
-
-strings ${home}/Image 2>/dev/null | grep -E -m1 'Linux version.*#' > ${home}/vertmp
 
 do_backup_flag=false
 if [ ! -f /vendor_dlkm/lib/modules/vertmp ]; then
@@ -323,9 +323,7 @@ if keycode_select \
     " " \
     "Note:" \
     "Always enabling 360HZ will NOT improve the daily" \
-    "use experience and increase power consumption." \
-    "If you regret it, you can install this kernel again" \
-    "and choose No at this step."; then
+    "use experience and increase power consumption."; then
 	echo "options goodix_core force_high_report_rate=y" >> $vendor_dlkm_modules_options_file
 fi
 
@@ -361,7 +359,8 @@ if ! ${skip_option_fix_battery_usage}; then
 	    "Note:" \
 	    "Select Yes if you are using AOSP rom and find" \
 	    "abnormal battery usage data in the system." \
-	    "Select No if you are using MIUI/HyperOS/AOSPA rom."; then
+	    "Select No if you are using MIUI, HyperOS," \
+	    "or AOSPA rom."; then
 		do_fix_battery_usage=true
 	fi
 fi
@@ -682,8 +681,8 @@ unset is_hyperos_fw is_miui_rom
 
 # Patch vbmeta
 ui_print " "
-for vbmeta_blk in /dev/block/bootdevice/by-name/vbmeta*; do
-	ui_print "- Patching ${vbmeta_blk} ..."
+for vbmeta_blk in /dev/block/by-name/vbmeta*; do
+	ui_print "- Patching $(basename $vbmeta_blk) ..."
 	${bin}/vbmeta-disable-verification $vbmeta_blk || {
 		ui_print "! Failed to patching ${vbmeta_blk}!"
 		ui_print "- If the device won't boot after the installation,"
