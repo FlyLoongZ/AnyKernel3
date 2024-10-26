@@ -161,6 +161,44 @@ check_super_device_size() {
 		abort "! Super block device size mismatch!"
 }
 
+# copy_gpu_pwrlevels_conf <orig dtb file> <new dtb file>
+copy_gpu_pwrlevels_conf() {
+	local orig_dtb=$1
+	local new_dtb=$2
+	local f node reg gpu_freq bus_freq bus_min bus_max level cx_level acd_level initial_pwrlevel
+
+	# Clear the gpu frequency and voltage configuration of new_dtb
+	for node in $(${bin}/fdtget "$new_dtb" /soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels -l); do
+		${bin}/fdtput "$new_dtb" -r "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node"
+	done
+
+	for node in $(${bin}/fdtget "$orig_dtb" /soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels -l | sort -r); do
+		# Read
+		      reg=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "reg" -tu)
+		 gpu_freq=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,gpu-freq" -tu)
+		 bus_freq=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-freq" -tu)
+		  bus_min=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-min" -tu)
+		  bus_max=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-max" -tu)
+		    level=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,level" -tu)
+		 cx_level=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,cx-level" -tu)
+		acd_level=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,acd-level" -tx)
+
+		# Write
+		${bin}/fdtput "$new_dtb" -c "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node"
+		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,cx-level"  "$cx_level" -tu
+		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,acd-level" "$acd_level" -tx
+		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-max"   "$bus_max" -tu
+		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-min"   "$bus_min" -tu
+		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-freq"  "$bus_freq" -tu
+		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,level"     "$level" -tu
+		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,gpu-freq"  "$gpu_freq" -tu
+		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "reg" "$reg" -tu
+	done
+
+	initial_pwrlevel=$(${bin}/fdtget "$orig_dtb" /soc/qcom,kgsl-3d0@3d00000 "qcom,initial-pwrlevel" -tu)
+	${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000" "qcom,initial-pwrlevel" "$initial_pwrlevel" -tu
+}
+
 # Check firmware
 if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'; then
 	ui_print "HyperOS firmware detected!"
@@ -615,6 +653,26 @@ else
 	rm ${home}/dtbo-1.img
 fi
 unset fix_panel_dimension
+
+# Copy the gpu frequency and voltage configuration of old dtb to the new dtb
+mkdir ${home}/_dtbs
+cp ${split_img}/dtb ${home}/_dtbs/dtb
+dtb_img_splitted=`${bin}/dtp -i ${home}/_dtbs/dtb | awk '{print $NF}'` || abort "! Failed to split dtb file!"
+ukee_dtb=
+for dtb_file in $dtb_img_splitted; do
+	if [ "$(${bin}/fdtget $dtb_file / model -ts)" == "Qualcomm Technologies, Inc. Ukee SoC" ]; then
+		ukee_dtb="$dtb_file"
+		break
+	fi
+done
+[ -z "$ukee_dtb" ] && abort "! Can not found Ukee dtb file!"
+
+copy_gpu_pwrlevels_conf "$ukee_dtb" ${home}/dtb
+sync
+
+rm -rf ${home}/_dtbs
+
+unset dtb_img_splitted ukee_dtb
 
 write_boot  # Since dtbo.img exists in ${home}, the dtbo partition will also be flashed at this time
 
