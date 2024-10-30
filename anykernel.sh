@@ -634,6 +634,14 @@ no_magisk_check=true
 # reset for vendor_boot patching
 reset_ak
 
+# Try to fix vendor_ramdisk size and vendor_ramdisk table entry information that was corrupted by old versions of magiskboot.
+${bin}/vendor_boot_fix "$block"
+case $? in
+	0) ui_print " " "- Successfully repaired the vendor_boot partition!";;
+	2) ;;  # The vendor_boot partition is normal and does not need to be repaired.
+	*) abort "! Failed to repair vendor_boot partition!";;
+esac
+
 # vendor_boot install
 dump_boot
 
