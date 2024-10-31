@@ -811,19 +811,10 @@ patch_ueventd() {
 ### configuration/setup functions:
 # reset_ak [keep]
 reset_ak() {
-  local current i;
+  local i;
 
-  current=$(dirname $home/*-files/current);
-  if [ -d "$current" ]; then
-    for i in $bootimg $home/boot-new.img; do
-      [ -e $i ] && cp -af $i $current;
-    done;
-    for i in $current/*; do
-      [ -f $i ] && rm -f $home/$(basename $i);
-    done;
-  fi;
   [ -d $split_img ] && rm -rf $ramdisk;
-  rm -rf $bootimg $split_img $home/*-new* $home/*-files/current;
+  rm -rf $bootimg $split_img $home/*-new*;
 
   if [ "$1" == "keep" ]; then
     [ -d $home/rdtmp ] && mv -f $home/rdtmp $ramdisk;
