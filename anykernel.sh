@@ -674,8 +674,10 @@ for dtb_file in $dtb_img_splitted; do
 done
 [ -z "$ukee_dtb" ] && abort "! Can not found Ukee dtb file!"
 
-copy_gpu_pwrlevels_conf "$ukee_dtb" ${home}/dtb
-sync
+if [ "$(sha1 $ukee_dtb)" != "$(sha1 ${home}/dtb)" ]; then
+	copy_gpu_pwrlevels_conf "$ukee_dtb" ${home}/dtb
+	sync
+fi
 
 rm -rf ${home}/_dtbs
 
