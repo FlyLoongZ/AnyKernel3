@@ -208,10 +208,6 @@ else
 	is_hyperos_fw=false
 fi
 
-# Check rom type
-is_miui_rom=false
-[ -f /system/framework/MiuiBooster.jar ] && is_miui_rom=true
-
 # Staging unmodified partition images
 mkdir -p ${home}/_orig
 cp ${home}/boot.img ${home}/_orig/boot.img
@@ -248,6 +244,18 @@ if [ "$snapshot_status" != "none" ]; then
 	abort "Aborting..."
 fi
 unset rc snapshot_status
+
+# Check rom type
+is_miui_rom=false
+is_aospa_rom=false
+is_oss_kernel_rom=false
+if [ -f /system/framework/MiuiBooster.jar ] && keycode_select "Is your current rom MIUI/HyperOS? (I guess yes)"; then
+	is_miui_rom=true
+elif cat /system/build.prop | grep -qi 'aospa' && keycode_select "Is your current rom AOSPA? (I guess yes)"; then
+	is_aospa_rom=true
+elif keycode_select "Is your rom originally based on OSS kernel?"; then
+	is_oss_kernel_rom=true
+fi
 
 [ -f ${home}/Image.7z ] || abort "! Cannot found ${home}/Image.7z!"
 ui_print " "
@@ -346,21 +354,19 @@ fi
 
 do_fix_battery_usage=false
 skip_option_fix_battery_usage=false
-if ${is_fixed_qbc_driver}; then
+if ${is_fixed_qbc_driver} || ${is_oss_kernel_rom}; then
 	do_fix_battery_usage=true
 	skip_option_fix_battery_usage=true
-elif ${is_miui_rom} || cat /system/build.prop | grep -qi 'aospa'; then
+elif ${is_miui_rom} || ${is_aospa_rom}; then
 	skip_option_fix_battery_usage=true
 fi
 if ! ${skip_option_fix_battery_usage}; then
 	if keycode_select \
-	    "Fix battery usage issue with AOSP rom?" \
+	    "Fix battery usage issue?" \
 	    " " \
 	    "Note:" \
-	    "Select Yes if you are using AOSP rom and find" \
-	    "abnormal battery usage data in the system." \
-	    "Select No if you are using MIUI, HyperOS," \
-	    "or AOSPA rom."; then
+	    "Select Yes if you find that the battery usage data" \
+	    "in the system settings is not displayed."; then
 		do_fix_battery_usage=true
 	fi
 fi
@@ -375,11 +381,36 @@ if [ -n "${qti_battery_charger_mod_options}" ]; then
 fi
 unset modname_qti_battery_charger qti_battery_charger_mod_options
 
+# Alternative wired headset buttons mode
+use_wired_btn_altmode=false
+skip_option_wired_btn_altmode=false
+if ${is_miui_rom}; then
+	skip_option_wired_btn_altmode=true
+elif ${is_oss_kernel_rom} || ${is_aospa_rom}; then
+	use_wired_btn_altmode=true
+	skip_option_wired_btn_altmode=false
+fi
+if ! ${skip_option_wired_btn_altmode}; then
+	if keycode_select \
+	    "Use alternative wired headset buttons mode?" \
+	    " " \
+	    "Note:" \
+	    "Select Yes if you find that the volume buttons on" \
+	    "your wired headset are not working properly." \
+	    "Select No if you are using MIUI/HyperOS rom."; then
+		use_wired_btn_altmode=true
+	fi
+fi
+if ${use_wired_btn_altmode}; then
+	echo "options machine_dlkm waipio_wired_btn_altmode=y" >> $vendor_dlkm_modules_options_file
+fi
+unset use_wired_btn_altmode skip_option_wired_btn_altmode
+
 # OSS msm_drm.ko
 if ${is_hyperos_fw}; then
 	use_oss_msm_drm=false
 	skip_option_oss_msm_drm=false
-	if [ -f /vendor/bin/sensor-notifier ]; then
+	if ${is_oss_kernel_rom} || ${is_aospa_rom} || [ -f /vendor/bin/sensor-notifier ]; then
 		use_oss_msm_drm=true
 		skip_option_oss_msm_drm=true
 	fi
@@ -401,53 +432,6 @@ if ${is_hyperos_fw}; then
 	unset use_oss_msm_drm skip_option_oss_msm_drm
 fi
 
-# Alternative wired headset buttons mode
-use_wired_btn_altmode=false
-skip_option_wired_btn_altmode=false
-if ${is_miui_rom}; then
-	skip_option_wired_btn_altmode=true
-fi
-if ! ${skip_option_wired_btn_altmode}; then
-	if keycode_select \
-	    "Use alternative wired headset buttons mode?" \
-	    " " \
-	    "Note:" \
-	    "Select Yes if you find that the volume buttons on" \
-	    "your wired headset are not working properly." \
-	    "Select No if you are using MIUI/HyperOS rom."; then
-		use_wired_btn_altmode=true
-	fi
-fi
-if ${use_wired_btn_altmode}; then
-	echo "options machine_dlkm waipio_wired_btn_altmode=y" >> $vendor_dlkm_modules_options_file
-fi
-unset use_wired_btn_altmode skip_option_wired_btn_altmode
-
-# Correct physical panel dimensions
-fix_panel_dimension=false
-skip_option_fix_panel_dimension=false
-if ${is_miui_rom} || cat /system/build.prop | grep -qi 'aospa'; then
-	skip_option_fix_panel_dimension=true
-fi
-if ! ${skip_option_fix_panel_dimension}; then
-	if keycode_select \
-	    "Correct physical panel dimensions?" \
-	    " " \
-	    "Note:" \
-	    "Select Yes if you are using a ROM based on" \
-	    "the OSS kernel and find that the buttons of" \
-	    "MIUI camera app are too small." \
-	    "Select No if you are using MIUI, HyperOS," \
-	    "or AOSPA rom." \
-	    " " \
-	    "WARNING:" \
-	    "Selecting the wrong option may cause the" \
-	    "touchscreen to not operate properly!"; then
-		fix_panel_dimension=true
-	fi
-fi
-unset skip_option_fix_panel_dimension
-
 unset vendor_dlkm_modules_options_file
 
 # Do not load millet related modules in AOSP rom
@@ -455,6 +439,14 @@ if ! ${is_miui_rom}; then
 	for module_name in millet_core millet_binder millet_hs millet_oem_cgroup millet_pkg millet_sig; do
 		echo "blocklist $module_name" >> ${home}/_vendor_dlkm_modules/modules.blocklist
 	done
+fi
+
+if ! keycode_select \
+    "This is the last option." \
+    " " \
+    "Select Yes to start the installation." \
+    "Select No to exit the installer."; then
+	abort "Abort by user."
 fi
 
 ui_print " "
@@ -652,14 +644,13 @@ set_perm 0 0 0644 ${vendor_boot_modules_dir}/*
 
 ${bin}/7za x ${home}/_dtb.7z -o${home}/ || abort "! Failed to unpack _dtb.7z!"
 
-if ${fix_panel_dimension}; then
+if ${is_oss_kernel_rom}; then
 	mv ${home}/dtbo-1.img ${home}/dtbo.img
 	rm ${home}/dtbo-0.img
 else
 	mv ${home}/dtbo-0.img ${home}/dtbo.img
 	rm ${home}/dtbo-1.img
 fi
-unset fix_panel_dimension
 
 # Copy the gpu frequency and voltage configuration of old dtb to the new dtb
 mkdir ${home}/_dtbs
@@ -687,7 +678,7 @@ write_boot  # Since dtbo.img exists in ${home}, the dtbo partition will also be 
 
 ########## FLASH VENDOR_BOOT END ##########
 
-unset is_hyperos_fw is_miui_rom
+unset is_hyperos_fw is_miui_rom is_aospa_rom is_oss_kernel_rom
 
 # Patch vbmeta
 ui_print " "
