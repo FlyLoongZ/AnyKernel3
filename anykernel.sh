@@ -436,7 +436,7 @@ unset vendor_dlkm_modules_options_file
 
 # Do not load millet related modules in AOSP rom
 if ! ${is_miui_rom}; then
-	for module_name in millet_core millet_binder millet_hs millet_oem_cgroup millet_pkg millet_sig; do
+	for module_name in millet_core millet_binder millet_hs millet_oem_cgroup millet_pkg millet_sig binder_gki; do
 		echo "blocklist $module_name" >> ${home}/_vendor_dlkm_modules/modules.blocklist
 	done
 fi
