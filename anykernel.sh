@@ -203,6 +203,35 @@ copy_gpu_pwrlevels_conf() {
 if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'; then
 	ui_print "HyperOS firmware detected!"
 	is_hyperos_fw=true
+	is_hyperos_fw_with_new_adsp2=false
+	if [ -d /vendor/firmware_mnt/image ]; then
+		modem_mount_path=/vendor/firmware_mnt
+	else
+		for blk in /dev/block/bootdevice/modem${slot} /dev/block/bootdevice/by-name/modem${slot} "$(readlink /dev/block/bootdevice/by-name/modem${slot})"; do
+			if mount | grep -qE "^${blk} "; then
+				modem_mount_path=$(mount | grep -E "^${blk} " | awk '{print $3}')
+				break
+			fi
+		done
+	fi
+	if [ -z "$modem_mount_path" ]; then
+		mkdir ${home}/_modem_mnt
+		mount /dev/block/bootdevice/by-name/modem${slot} ${home}/_modem_mnt -o ro || \
+			abort "! Failed to mount modem partition!"
+		modem_mount_path=${home}/_modem_mnt
+	fi
+
+	if strings "${modem_mount_path}/image/adsp2.b18" | grep -q 'audiostatus'; then
+		ui_print "Upgraded adsp2 firmware detected!"
+		is_hyperos_fw_with_new_adsp2=true
+	fi
+
+	if [ -d "${home}/_modem_mnt" ]; then
+		umount ${home}/_modem_mnt
+		rmdir ${home}/_modem_mnt
+	fi
+
+	unset modem_mount_path
 else
 	ui_print "MIUI14 firmware detected!"
 	is_hyperos_fw=false
@@ -320,6 +349,10 @@ fi
 [ -f $modules_pkg ] || abort "! Cannot found ${modules_pkg}!"
 ${bin}/7za x $modules_pkg -o${home}/ && [ -d ${home}/_vendor_boot_modules ] && [ -d ${home}/_vendor_dlkm_modules ] || \
 	abort "! Failed to unpack ${modules_pkg}!"
+if ${is_hyperos_fw} && ${is_hyperos_fw_with_new_adsp2}; then
+	cp -f ${home}/_alt/NEW-qti_battery_charger_main.ko       ${home}/_vendor_dlkm_modules/qti_battery_charger_main.ko
+	cp -f ${home}/_alt/NEW-qti_battery_charger_main-STOCK.ko ${home}/_vendor_boot_modules/qti_battery_charger_main.ko
+fi
 unset modules_pkg
 
 vendor_dlkm_modules_options_file=${home}/_vendor_dlkm_modules/modules.options
@@ -678,7 +711,7 @@ write_boot  # Since dtbo.img exists in ${home}, the dtbo partition will also be 
 
 ########## FLASH VENDOR_BOOT END ##########
 
-unset is_hyperos_fw is_miui_rom is_aospa_rom is_oss_kernel_rom
+unset is_hyperos_fw is_miui_rom is_aospa_rom is_oss_kernel_rom is_hyperos_fw_with_new_adsp2
 
 # Patch vbmeta
 ui_print " "
