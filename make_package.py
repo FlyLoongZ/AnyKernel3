@@ -105,17 +105,17 @@ def make_zip(*include):
     return zip_path
 
 @timeit
-def make_7z(path_, output_file):
+def make_7z(path_, output_file, extra_args=""):
     if os.path.isdir(path_):
         with change_dir(path_):
             rc, text = subprocess.getstatusoutput(
-                '7za a -t7z -mx=9 -bd "%s" "./*"' % (os.path.abspath(output_file))
+                '7za a -t7z -mx=9 %s -bd "%s" "./*"' % (extra_args, os.path.abspath(output_file))
             )
     else:
         dirname, basename = os.path.split(path_)
         with change_dir(dirname):
             rc, text = subprocess.getstatusoutput(
-                '7za a -t7z -mx=9 -bd "%s" "./%s"' % (os.path.abspath(output_file), basename)
+                '7za a -t7z -mx=9 %s -bd "%s" "./%s"' % (extra_args, os.path.abspath(output_file), basename)
             )
     print(text)
     assert rc == 0
@@ -148,10 +148,10 @@ def main_multi(build_version):
         make_7z(local_path("Image"), local_path("Image.7z"))
 
         rich.print("[yellow][5/8][/yellow] [green]Compressing _modules_miui.7z ...[/green]")
-        make_7z(local_path("_modules_miui"), local_path("_modules_miui.7z"))
+        make_7z(local_path("_modules_miui"), local_path("_modules_miui.7z"), extra_args="-mf=off")
 
         rich.print("[yellow][6/8][/yellow] [green]Compressing _modules_hyperos.7z ...[/green]")
-        make_7z(local_path("_modules_hyperos"), local_path("_modules_hyperos.7z"))
+        make_7z(local_path("_modules_hyperos"), local_path("_modules_hyperos.7z"), extra_args="-mf=off")
 
         rich.print("[yellow][7/8][/yellow] [green]Compressing _dtb.7z ...[/green]")
         make_7z(local_path("_dtb"), local_path("_dtb.7z"))
