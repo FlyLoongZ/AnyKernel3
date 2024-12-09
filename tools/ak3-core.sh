@@ -829,7 +829,7 @@ reset_ak() {
 
 # setup_ak
 setup_ak() {
-  local blockfiles plistboot plistinit plistreco parttype name part mtdmount mtdpart mtdname target;
+  local plistboot plistinit plistreco parttype name part mtdmount mtdpart mtdname target;
 
   # slot detection enabled by is_slot_device=1 or auto (from anykernel.sh)
   case $is_slot_device in

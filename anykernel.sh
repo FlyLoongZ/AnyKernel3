@@ -165,7 +165,7 @@ check_super_device_size() {
 copy_gpu_pwrlevels_conf() {
 	local orig_dtb=$1
 	local new_dtb=$2
-	local f node reg gpu_freq bus_freq bus_min bus_max level cx_level acd_level initial_pwrlevel
+	local node reg gpu_freq bus_freq bus_min bus_max level cx_level acd_level initial_pwrlevel
 
 	# Clear the gpu frequency and voltage configuration of new_dtb
 	for node in $(${bin}/fdtget "$new_dtb" /soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels -l); do
@@ -204,7 +204,7 @@ if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'
 	ui_print "HyperOS firmware detected!"
 	is_hyperos_fw=true
 	is_hyperos_fw_with_new_adsp2=false
-	if [ -d /vendor/firmware_mnt/image ]; then
+	if is_mounted /vendor/firmware_mnt && [ -d /vendor/firmware_mnt/image ]; then
 		modem_mount_path=/vendor/firmware_mnt
 	else
 		for blk in /dev/block/bootdevice/modem${slot} /dev/block/bootdevice/by-name/modem${slot} "$(readlink /dev/block/bootdevice/by-name/modem${slot})"; do
@@ -213,12 +213,12 @@ if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'
 				break
 			fi
 		done
-	fi
-	if [ -z "$modem_mount_path" ]; then
-		mkdir ${home}/_modem_mnt
-		mount /dev/block/bootdevice/by-name/modem${slot} ${home}/_modem_mnt -o ro || \
-			abort "! Failed to mount modem partition!"
-		modem_mount_path=${home}/_modem_mnt
+		if [ -z "$modem_mount_path" ]; then
+			mkdir ${home}/_modem_mnt
+			mount /dev/block/bootdevice/by-name/modem${slot} ${home}/_modem_mnt -o ro || \
+				abort "! Failed to mount modem partition!"
+			modem_mount_path=${home}/_modem_mnt
+		fi
 	fi
 
 	if strings "${modem_mount_path}/image/adsp2.b18" | grep -q 'audiostatus'; then
