@@ -315,7 +315,29 @@ $BOOTMODE || umount /vendor_dlkm
 [ -f ${split_img}/ramdisk.cpio ] || abort "! Cannot found ramdisk.cpio!"
 ${bin}/magiskboot cpio ${split_img}/ramdisk.cpio test
 magisk_patched=$?
+exist_ksu_lkm=false
 if ${bin}/magiskboot cpio ${split_img}/ramdisk.cpio "exists kernelsu.ko"; then
+	${bin}/magiskboot cpio ${split_img}/ramdisk.cpio "extract kernelsu.ko ${home}/kernelsu.ko" || \
+		abort "! Failed to extract kernelsu.ko!"
+	if strings ${home}/kernelsu.ko | grep -q 'clang version 12.0.5'; then
+		exist_ksu_lkm=true
+	else
+		ui_print "- Detected KernelSU LKM incompatible with GKI."
+		ui_print "- Uninstalling KernelSU LKM..."
+		# TODO: chomd init
+		if ${bin}/magiskboot cpio ${split_img}/ramdisk.cpio \
+		    "rm kernelsu.ko" \
+		    "rm init" \
+		    "mv init.real init"; then
+			ui_print "- Successfully uninstalled KernelSU LKM!"
+			sleep 3
+		else
+			abort "! Failed to uninstall KernelSU LKM!"
+		fi
+	fi
+	rm ${home}/kernelsu.ko
+fi
+if ${exist_ksu_lkm}; then
 	ui_print "- KernelSU LKM detected!"
 	ui_print "- Then you can only install Melt Kernel without KernelSU support!"
 	if [ $((magisk_patched & 3)) -eq 1 ]; then
@@ -334,6 +356,7 @@ elif keycode_select "Choose whether to install KernelSU support."; then
 	ui_print "- Patching Kernel image..."
 	apply_patch ${home}/Image "$SHA1_STOCK" "$SHA1_KSU" ${home}/bs_patches/ksu.p
 fi
+unset exist_ksu_lkm
 export magisk_patched
 
 # Fix unable to mount image as read-write in recovery
