@@ -465,6 +465,28 @@ if ${is_hyperos_fw}; then
 	unset use_oss_msm_drm skip_option_oss_msm_drm
 fi
 
+# OSS zram.ko & zsmalloc.ko
+use_stock_zram_mods=false
+if ${is_miui_rom}; then
+	if keycode_select \
+	    "Use Xiaomi's stock zram kernel modules?" \
+	    " " \
+	    "Note:" \
+	    "The stock zram kernel modules has specific" \
+	    "optimizations for MIUI/HyperOS roms, while the OSS" \
+	    "zram kernel modules is more stable." \
+	    " " \
+	    "Select Yes to use stock zram kernel modules." \
+	    "Select No to use OSS zram kernel modules."; then
+		use_stock_zram_mods=true
+	fi
+fi
+if ${use_stock_zram_mods}; then
+	cp -f ${home}/_alt/MI-zram.ko ${home}/_vendor_dlkm_modules/zram.ko
+	cp -f ${home}/_alt/MI-zsmalloc.ko ${home}/_vendor_dlkm_modules/zsmalloc.ko
+fi
+unset use_stock_zram_mods
+
 unset vendor_dlkm_modules_options_file
 
 # Do not load millet related modules in AOSP rom
