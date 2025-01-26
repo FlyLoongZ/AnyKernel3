@@ -512,6 +512,19 @@ unset use_stock_zram_mods
 
 unset vendor_dlkm_modules_options_file
 
+# Disguised the GPU model as Adreno730v3
+disguised_adreno730=false
+if keycode_select \
+    "Disguised the GPU model as Adreno730?" \
+    " " \
+    "Note:" \
+    "The GPU model of Snapdragon 8+ Gen1 is Adreno730." \
+    "Disguising the GPU model as Adreno730 may unlock" \
+    "higher image quality and frame rate in some mobile" \
+    "games, but the side effects are unknown."; then
+	disguised_adreno730=true
+fi
+
 # Do not load millet related modules in AOSP rom
 if ! ${is_miui_rom}; then
 	for module_name in millet_core millet_binder millet_hs millet_oem_cgroup millet_pkg millet_sig binder_gki; do
@@ -730,7 +743,6 @@ else
 	rm ${home}/dtbo-1.img
 fi
 
-# Copy the gpu frequency and voltage configuration of old dtb to the new dtb
 mkdir ${home}/_dtbs
 cp ${split_img}/dtb ${home}/_dtbs/dtb
 dtb_img_splitted=`${bin}/dtp -i ${home}/_dtbs/dtb | awk '{print $NF}'` || abort "! Failed to split dtb file!"
@@ -743,6 +755,12 @@ for dtb_file in $dtb_img_splitted; do
 done
 [ -z "$ukee_dtb" ] && abort "! Can not found Ukee dtb file!"
 
+if ${disguised_adreno730}; then
+	${bin}/fdtput ${home}/dtb "/soc/qcom,kgsl-3d0@3d00000" "qcom,gpu-model" "Adreno730v3" -ts
+fi
+unset disguised_adreno730
+
+# Copy the gpu frequency and voltage configuration of old dtb to the new dtb
 if [ "$(sha1 $ukee_dtb)" != "$(sha1 ${home}/dtb)" ]; then
 	copy_gpu_pwrlevels_conf "$ukee_dtb" ${home}/dtb
 	sync
