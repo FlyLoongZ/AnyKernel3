@@ -444,7 +444,7 @@ if ${is_miui_rom}; then
 	skip_option_wired_btn_altmode=true
 elif ${is_oss_kernel_rom} || ${is_aospa_rom}; then
 	use_wired_btn_altmode=true
-	skip_option_wired_btn_altmode=false
+	skip_option_wired_btn_altmode=true
 fi
 if ! ${skip_option_wired_btn_altmode}; then
 	if keycode_select \
