@@ -488,6 +488,33 @@ if ${is_hyperos_fw}; then
 	unset use_oss_msm_drm skip_option_oss_msm_drm
 fi
 
+# OSS ir-spi.ko
+if ${is_hyperos_fw}; then
+	use_oss_ir_driver=false
+	skip_option_oss_ir_driver=false
+	if ${is_miui_rom} || ${is_aospa_rom}; then
+		skip_option_oss_ir_driver=true
+	elif ${is_oss_kernel_rom}; then
+		use_oss_ir_driver=true
+		skip_option_oss_ir_driver=true
+	fi
+	if ! ${skip_option_oss_ir_driver}; then
+		if keycode_select \
+		    "Use open source IR driver?" \
+		    " " \
+		    "Note:" \
+		    "Select Yes if you are using AOSP rom and find that" \
+		    "IR does not working properly." \
+		    "Select No if you are using MIUI/HyperOS/AOSPA rom."; then
+			use_oss_ir_driver=true
+		fi
+	fi
+	if ${use_oss_ir_driver}; then
+		cp -f ${home}/_alt/OSS-ir-spi.ko ${home}/_vendor_dlkm_modules/ir-spi.ko
+	fi
+	unset use_oss_ir_driver skip_option_oss_ir_driver
+fi
+
 # OSS zram.ko & zsmalloc.ko
 use_stock_zram_mods=false
 if ${is_miui_rom}; then
