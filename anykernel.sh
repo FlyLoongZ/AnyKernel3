@@ -301,6 +301,9 @@ is_mounted /vendor_dlkm || \
 	mount /vendor_dlkm -o ro || mount /dev/block/mapper/vendor_dlkm${slot} /vendor_dlkm -o ro || \
 		abort "! Failed to mount /vendor_dlkm"
 
+if strings /vendor_dlkm/lib/modules/xiaomi_touch.ko | grep -qi "LineageOS"; then
+	abort "! Error: Melt Kernel does not support your rom:/"
+fi
 do_backup_flag=false
 if [ ! -f /vendor_dlkm/lib/modules/vertmp ]; then
 	do_backup_flag=true
