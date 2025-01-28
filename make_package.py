@@ -94,6 +94,7 @@ def make_zip(*include):
                 elif os.path.isfile(item):
                     zip_.write(
                         item,
+                        arcname=os.path.basename(item) if os.path.isabs(item) else None,
                         compress_type=zipfile.ZIP_DEFLATED,
                         compresslevel=0 if _skip_compress(item) else 9,
                     )
@@ -123,6 +124,11 @@ def make_7z(path_, output_file, extra_args=""):
 def main_multi(build_version):
     image_stock = local_path("Image")
     image_ksu = local_path("Image_ksu")
+    temp_ak_sh = os.path.join(tempfile.gettempdir(), "anykernel.sh")
+    temp_image_7z = os.path.join(tempfile.gettempdir(), "Image.7z")
+    temp_dtb_7z = os.path.join(tempfile.gettempdir(), "_dtb.7z")
+    temp_mods_miui_7z = os.path.join(tempfile.gettempdir(), "_modules_miui.7z")
+    temp_mods_hos_7z = os.path.join(tempfile.gettempdir(), "_modules_hyperos.7z")
 
     assert os.path.exists(image_stock)
     assert os.path.exists(image_ksu)
@@ -142,39 +148,38 @@ def main_multi(build_version):
         assert do_depmod_regen(local_path(d, "_vendor_boot_modules"), "/lib/modules/") == 0
         assert do_depmod_regen(local_path(d, "_vendor_dlkm_modules"), "/vendor/lib/modules/") == 0
 
-    file2file(local_path("anykernel.sh"), local_path("anykernel.sh.BAK"), move=True)
     try:
         rich.print("[yellow][4/8][/yellow] [green]Compressing Image.7z ...[/green]")
-        make_7z(local_path("Image"), local_path("Image.7z"))
+        make_7z(local_path("Image"), temp_image_7z)
 
         rich.print("[yellow][5/8][/yellow] [green]Compressing _modules_miui.7z ...[/green]")
-        make_7z(local_path("_modules_miui"), local_path("_modules_miui.7z"), extra_args="-mf=off")
+        make_7z(local_path("_modules_miui"), temp_mods_miui_7z, extra_args="-mf=off")
 
         rich.print("[yellow][6/8][/yellow] [green]Compressing _modules_hyperos.7z ...[/green]")
-        make_7z(local_path("_modules_hyperos"), local_path("_modules_hyperos.7z"), extra_args="-mf=off")
+        make_7z(local_path("_modules_hyperos"), temp_mods_hos_7z, extra_args="-mf=off")
 
         rich.print("[yellow][7/8][/yellow] [green]Compressing _dtb.7z ...[/green]")
-        make_7z(local_path("_dtb"), local_path("_dtb.7z"))
+        make_7z(local_path("_dtb"), temp_dtb_7z)
 
         rich.print("[yellow][8/8][/yellow] [green]Making zip package...[/green]")
         with change_dir(BASE_DIR):
-            with open("anykernel.sh.BAK", "r", encoding='utf-8') as f1:
-                with open("anykernel.sh", "w", encoding='utf-8', newline='\n') as f2:
+            with open("anykernel.sh", "r", encoding='utf-8') as f1:
+                with open(temp_ak_sh, "w", encoding='utf-8', newline='\n') as f2:
                     f2.write(
                         f1.read().replace("@SHA1_STOCK@", sha1_image_stock).replace("@SHA1_KSU@", sha1_image_ksu)
                     )
             zip_file = make_zip(
-                "META-INF", "tools", "_modules_miui.7z", "_modules_hyperos.7z", "_dtb.7z", "bs_patches",
-                "anykernel.sh", "_restore_anykernel.sh", "_rollback_anykernel.sh", "Image.7z",
+                "META-INF", "tools", "bs_patches",
+                temp_mods_miui_7z, temp_mods_hos_7z, temp_dtb_7z, temp_image_7z, temp_ak_sh,
+                "_restore_anykernel.sh", "_rollback_anykernel.sh",
                 "LICENSE", "banner",
             )
     finally:
-        remove_path(local_path("anykernel.sh"))
-        remove_path(local_path("_modules_miui.7z"))
-        remove_path(local_path("_modules_hyperos.7z"))
-        remove_path(local_path("_dtb.7z"))
-        remove_path(local_path("Image.7z"))
-        file2file(local_path("anykernel.sh.BAK"), local_path("anykernel.sh"), move=True)
+        remove_path(temp_ak_sh)
+        remove_path(temp_mods_miui_7z)
+        remove_path(temp_mods_hos_7z)
+        remove_path(temp_dtb_7z)
+        remove_path(temp_image_7z)
     dst_zip_file = local_path(PACKAGE_NAME_MULTI % build_version)
     file2file(zip_file, dst_zip_file, move=True)
 
