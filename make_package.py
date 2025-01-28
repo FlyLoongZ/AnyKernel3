@@ -59,7 +59,7 @@ def mkdir(path):
     os.makedirs(path)
 
 def file2file(src, dst, move=False):
-    mkdir(os.path.split(dst)[0])
+    mkdir(os.path.dirname(dst))
     if move:
         shutil.move(src, dst)
     else:
@@ -87,7 +87,7 @@ def make_zip(*include):
                     for root, dirs, files in os.walk(item):
                         for f in files:
                             zip_.write(
-                                os.path.join(root, f),
+                                str(os.path.join(root, f)),
                                 compress_type=zipfile.ZIP_DEFLATED,
                                 compresslevel=0 if _skip_compress(f) else 9,
                             )
@@ -108,16 +108,14 @@ def make_zip(*include):
 @timeit
 def make_7z(path_, output_file, extra_args=""):
     if os.path.isdir(path_):
-        with change_dir(path_):
-            rc, text = subprocess.getstatusoutput(
-                '7za a -t7z -mx=9 %s -bd "%s" "./*"' % (extra_args, os.path.abspath(output_file))
-            )
+        rc, text = subprocess.getstatusoutput(
+            'cd "%s" && 7za a -t7z -mx=9 %s -bd "%s" "./*"' % (path_, extra_args, os.path.abspath(output_file))
+        )
     else:
         dirname, basename = os.path.split(path_)
-        with change_dir(dirname):
-            rc, text = subprocess.getstatusoutput(
-                '7za a -t7z -mx=9 %s -bd "%s" "./%s"' % (extra_args, os.path.abspath(output_file), basename)
-            )
+        rc, text = subprocess.getstatusoutput(
+            'cd "%s" && 7za a -t7z -mx=9 %s -bd "%s" "./%s"' % (dirname, extra_args, os.path.abspath(output_file), basename)
+        )
     print(text)
     assert rc == 0
 
