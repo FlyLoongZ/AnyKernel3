@@ -18,8 +18,14 @@ import rich
 from depmod_regen import main as do_depmod_regen
 
 
+SIGN_ZIP = False
+APKSIGNER_JAR = 'apksigner.jar'
+SIGN_PRIVATE_KEY = 'your_pk.jks'
+SIGN_PRIVATE_KEY_PASSWORD = 'pass:your_pk_password'
+
 assert sys.platform == "linux"
 assert subprocess.getstatusoutput("which 7za")[0] == 0
+assert subprocess.getstatusoutput("which java")[0] == 0
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PACKAGE_NAME_MULTI = "Melt-marble-%s-multi.zip"
@@ -119,6 +125,19 @@ def make_7z(path_, output_file, extra_args=""):
     print(text)
     assert rc == 0
 
+def sign_zip(zip_path):
+    # Signing a zip file is just like signing an apk
+    try:
+        rc, text = subprocess.getstatusoutput(
+            'java -jar "%s" sign --ks "%s" --ks-pass "%s" --min-sdk-version 32 "%s"' % (
+                APKSIGNER_JAR, SIGN_PRIVATE_KEY, SIGN_PRIVATE_KEY_PASSWORD, zip_path,
+            )
+        )
+        print(text)
+        assert rc == 0
+    finally:
+        remove_path(zip_path + ".idsig")
+
 def main_multi(build_version):
     image_stock = local_path("Image")
     image_ksu = local_path("Image_ksu")
@@ -131,35 +150,35 @@ def main_multi(build_version):
     assert os.path.exists(image_stock)
     assert os.path.exists(image_ksu)
 
-    rich.print("[yellow][1/8][/yellow] [green]Generating SHA1 for image files...[/green]")
+    rich.print("[yellow][1/9][/yellow] [green]Generating SHA1 for image files...[/green]")
     sha1_image_stock = get_sha1(image_stock)
     sha1_image_ksu = get_sha1(image_ksu)
     print("SHA1 for Image    :", sha1_image_stock)
     print("SHA1 for Image_ksu:", sha1_image_ksu)
 
-    rich.print("[yellow][2/8][/yellow] [green]Generating patch file...[/green]")
+    rich.print("[yellow][2/9][/yellow] [green]Generating patch file...[/green]")
     remove_path(local_path("bs_patches", "ksu.p"))
     bsdiff4_file_diff(image_stock, image_ksu, local_path("bs_patches", "ksu.p"))
 
-    rich.print("[yellow][3/8][/yellow] [green]Regenerating module dependency information...[/green]")
+    rich.print("[yellow][3/9][/yellow] [green]Regenerating module dependency information...[/green]")
     for d in ("_modules_miui", "_modules_hyperos"):
         assert do_depmod_regen(local_path(d, "_vendor_boot_modules"), "/lib/modules/") == 0
         assert do_depmod_regen(local_path(d, "_vendor_dlkm_modules"), "/vendor/lib/modules/") == 0
 
     try:
-        rich.print("[yellow][4/8][/yellow] [green]Compressing Image.7z ...[/green]")
+        rich.print("[yellow][4/9][/yellow] [green]Compressing Image.7z ...[/green]")
         make_7z(local_path("Image"), temp_image_7z)
 
-        rich.print("[yellow][5/8][/yellow] [green]Compressing _modules_miui.7z ...[/green]")
+        rich.print("[yellow][5/9][/yellow] [green]Compressing _modules_miui.7z ...[/green]")
         make_7z(local_path("_modules_miui"), temp_mods_miui_7z, extra_args="-mf=off")
 
-        rich.print("[yellow][6/8][/yellow] [green]Compressing _modules_hyperos.7z ...[/green]")
+        rich.print("[yellow][6/9][/yellow] [green]Compressing _modules_hyperos.7z ...[/green]")
         make_7z(local_path("_modules_hyperos"), temp_mods_hos_7z, extra_args="-mf=off")
 
-        rich.print("[yellow][7/8][/yellow] [green]Compressing _dtb.7z ...[/green]")
+        rich.print("[yellow][7/9][/yellow] [green]Compressing _dtb.7z ...[/green]")
         make_7z(local_path("_dtb"), temp_dtb_7z)
 
-        rich.print("[yellow][8/8][/yellow] [green]Making zip package...[/green]")
+        rich.print("[yellow][8/9][/yellow] [green]Making zip package...[/green]")
         with change_dir(BASE_DIR):
             with open("anykernel.sh", "r", encoding='utf-8') as f1:
                 with open(temp_ak_sh, "w", encoding='utf-8', newline='\n') as f2:
@@ -178,6 +197,17 @@ def main_multi(build_version):
         remove_path(temp_mods_hos_7z)
         remove_path(temp_dtb_7z)
         remove_path(temp_image_7z)
+
+    rich.print("[yellow][9/9][/yellow] [green]Signing zip package...[/green]")
+    if SIGN_ZIP:
+        try:
+            sign_zip(zip_file)
+        except AssertionError:
+            remove_path(zip_file)
+            raise
+    else:
+        print("Skipping signing zip package...")
+
     dst_zip_file = local_path(PACKAGE_NAME_MULTI % build_version)
     file2file(zip_file, dst_zip_file, move=True)
 
