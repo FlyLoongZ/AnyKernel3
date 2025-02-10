@@ -343,13 +343,13 @@ fi
 if ${exist_ksu_lkm}; then
 	ui_print "- KernelSU LKM detected!"
 	ui_print "- Then you can only install Melt Kernel without KernelSU support!"
-	if [ $((magisk_patched & 3)) -eq 1 ]; then
+	if [ "$magisk_patched" -eq 1 ]; then
 		ui_print "- Magisk detected!"
 		ui_print "- Oh brother, it's crazy!"
 		sleep 3
 	fi
 elif keycode_select "Choose whether to install KernelSU support."; then
-	if [ $((magisk_patched & 3)) -eq 1 ]; then
+	if [ "$magisk_patched" -eq 1 ]; then
 		ui_print "- Magisk detected!"
 		ui_print "- We don't recommend using Magisk and KernelSU at the same time!"
 		ui_print "- If any problems occur, it's your own responsibility!"
