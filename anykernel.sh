@@ -495,9 +495,9 @@ fi
 if ${is_hyperos_fw}; then
 	use_oss_ir_driver=false
 	skip_option_oss_ir_driver=false
-	if ${is_miui_rom} || ${is_aospa_rom}; then
+	if ${is_miui_rom} || [ -f /vendor/bin/hw/android.hardware.ir@1.0-service ]; then
 		skip_option_oss_ir_driver=true
-	elif ${is_oss_kernel_rom}; then
+	elif [ -f /vendor/bin/hw/android.hardware.ir-service.xiaomi ]; then
 		use_oss_ir_driver=true
 		skip_option_oss_ir_driver=true
 	fi
