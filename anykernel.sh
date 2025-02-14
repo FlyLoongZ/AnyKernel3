@@ -286,6 +286,10 @@ elif keycode_select "Is your rom originally based on OSS kernel?"; then
 	is_oss_kernel_rom=true
 fi
 
+if [ -f /vendor/bin/hw/vendor.lineage.touch@1.0-service.xiaomi ]; then
+	abort "! Error: Melt Kernel does not support your rom:/"
+fi
+
 [ -f ${home}/Image.7z ] || abort "! Cannot found ${home}/Image.7z!"
 ui_print " "
 ui_print "- Unpacking kernel image..."
@@ -301,9 +305,6 @@ is_mounted /vendor_dlkm || \
 	mount /vendor_dlkm -o ro || mount /dev/block/mapper/vendor_dlkm${slot} /vendor_dlkm -o ro || \
 		abort "! Failed to mount /vendor_dlkm"
 
-if strings /vendor_dlkm/lib/modules/xiaomi_touch.ko | grep -qi "LineageOS"; then
-	abort "! Error: Melt Kernel does not support your rom:/"
-fi
 do_backup_flag=false
 if [ ! -f /vendor_dlkm/lib/modules/vertmp ]; then
 	do_backup_flag=true
