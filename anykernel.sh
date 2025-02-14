@@ -555,11 +555,14 @@ if keycode_select \
 	disguised_adreno730=true
 fi
 
-# Do not load millet related modules in AOSP rom
+# Do not load some Xiaomi special modules in AOSP roms
 if ! ${is_miui_rom}; then
+	# millet related modules
 	for module_name in millet_core millet_binder millet_hs millet_oem_cgroup millet_pkg millet_sig binder_gki; do
 		echo "blocklist $module_name" >> ${home}/_vendor_dlkm_modules/modules.blocklist
 	done
+	# binder_prio
+	echo "blocklist binder_prio" >> ${home}/_vendor_dlkm_modules/modules.blocklist
 fi
 
 if ! keycode_select \
