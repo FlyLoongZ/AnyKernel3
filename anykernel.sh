@@ -562,8 +562,13 @@ if ! ${is_miui_rom}; then
 	for module_name in millet_core millet_binder millet_hs millet_oem_cgroup millet_pkg millet_sig binder_gki; do
 		echo "blocklist $module_name" >> ${home}/_vendor_dlkm_modules/modules.blocklist
 	done
-	# binder_prio
-	echo "blocklist binder_prio" >> ${home}/_vendor_dlkm_modules/modules.blocklist
+	# Others
+	for module_name in extend_reclaim; do
+		echo "blocklist $module_name" >> ${home}/_vendor_boot_modules/modules.blocklist
+	done
+	for module_name in binder_prio mi_freqwdg miicmpfilter perf_helper; do
+		echo "blocklist $module_name" >> ${home}/_vendor_dlkm_modules/modules.blocklist
+	done
 fi
 
 if ! keycode_select \
