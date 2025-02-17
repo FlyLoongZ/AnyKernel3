@@ -125,9 +125,26 @@ do_panel_hack() {
 	done
 }
 
+do_xiaomi_touch_hack() {
+	local dtbo_file=$1
+	local fingerprint_screen_node fingerprint_screen_parent_node fingerprint_screen_panel_val lf_fingerprint_screen_panel_val
+
+	fingerprint_screen_node=$(fdtget "$dtbo_file" /__symbols__ fingerprint_screen -ts)
+	fingerprint_screen_parent_node=$(dirname $fingerprint_screen_node)
+	fingerprint_screen_panel_val=$(fdtget "$dtbo_file" "$fingerprint_screen_node" panel -tu)
+	fdtput "$dtbo_file" -c "${fingerprint_screen_parent_node}/xiaomi-touch"
+	fdtput "$dtbo_file" "${fingerprint_screen_parent_node}/xiaomi-touch" "panel-primary" $fingerprint_screen_panel_val -tu
+
+	if fdtget "$dtbo_file" "/__local_fixups__/${fingerprint_screen_node}" -l; then
+		lf_fingerprint_screen_panel_val=$(fdtget "$dtbo_file" "/__local_fixups__/${fingerprint_screen_node}" panel -tu)
+		fdtput "$dtbo_file" -c "/__local_fixups__${fingerprint_screen_parent_node}/xiaomi-touch"
+		fdtput "$dtbo_file" "/__local_fixups__${fingerprint_screen_parent_node}/xiaomi-touch" "panel-primary" $lf_fingerprint_screen_panel_val -tu
+	fi
+}
+
 echo "- Patching dtbo-1 ..."
 
-do_panel_hack ./dtbo-1 && sync || exit 1
+do_panel_hack ./dtbo-1 && do_xiaomi_touch_hack ./dtbo-1 && sync || exit 1
 
 ###############################################################################
 # Make dtbo.img

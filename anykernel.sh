@@ -286,10 +286,6 @@ elif keycode_select "Is your rom originally based on OSS kernel?"; then
 	is_oss_kernel_rom=true
 fi
 
-if [ -f /vendor/bin/hw/vendor.lineage.touch@1.0-service.xiaomi ]; then
-	abort "! Error: Melt Kernel does not support your rom:/"
-fi
-
 [ -f ${home}/Image.7z ] || abort "! Cannot found ${home}/Image.7z!"
 ui_print " "
 ui_print "- Unpacking kernel image..."
@@ -384,6 +380,17 @@ unset modules_pkg
 
 vendor_dlkm_modules_options_file=${home}/_vendor_dlkm_modules/modules.options
 [ -f $vendor_dlkm_modules_options_file ] || touch $vendor_dlkm_modules_options_file
+
+# xiaomi_touch.ko
+if ${is_hyperos_fw} && [ -f /vendor/bin/hw/vendor.lineage.touch@* ]; then
+	ui_print " "
+	ui_print "- Detected Lineage OSS xiaomi touch HAL."
+	ui_print "- Use the alternative touchscreen modules."
+	cp -f ${home}/_alt/xiaomi_touch_los/* ${home}/_vendor_dlkm_modules/
+	sed -i \
+	    's/\/vendor\/lib\/modules\/xiaomi_touch\.ko:/\/vendor\/lib\/modules\/xiaomi_touch\.ko:\ \/vendor\/lib\/modules\/panel_event_notifier\.ko/g' \
+	    ${home}/_vendor_dlkm_modules/modules.dep
+fi
 
 # goodix_core.ko
 if keycode_select \
