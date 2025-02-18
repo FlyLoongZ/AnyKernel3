@@ -152,7 +152,7 @@ check_super_device_size() {
 
 	block_device_size=$(get_size /dev/block/by-name/super) || \
 		abort "! Failed to get super block device size (by blockdev)!"
-	block_device_size_lp=$(${bin}/lpdump 2>/dev/null | grep -E 'Size: [[:digit:]]+ bytes$' | head -n1 | awk '{print $2}') || \
+	block_device_size_lp=$(${bin}/lpdump 2>/dev/null | grep -m1 -E 'Size: [[:digit:]]+ bytes$' | awk '{print $2}') || \
 		abort "! Failed to get super block device size (by lpdump)!"
 	ui_print "- Super block device size:"
 	ui_print "  - Read by blockdev: $block_device_size"
@@ -207,7 +207,7 @@ if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'
 	if is_mounted /vendor/firmware_mnt && [ -d /vendor/firmware_mnt/image ]; then
 		modem_mount_path=/vendor/firmware_mnt
 	else
-		for blk in /dev/block/bootdevice/modem${slot} /dev/block/bootdevice/by-name/modem${slot} "$(readlink /dev/block/bootdevice/by-name/modem${slot})"; do
+		for blk in /dev/block/by-name/modem${slot} /dev/block/bootdevice/by-name/modem${slot} "$(readlink /dev/block/bootdevice/by-name/modem${slot})"; do
 			if mount | grep -qE "^${blk} "; then
 				modem_mount_path=$(mount | grep -E "^${blk} " | awk '{print $3}')
 				break
@@ -252,8 +252,6 @@ if [ "$rc" != 0 ]; then
 		ui_print "If you are installing the kernel in an app, try using another app."
 		ui_print "Recommend KernelFlasher:"
 		ui_print "  https://github.com/capntrips/KernelFlasher/releases"
-	else
-		ui_print "Please try to reboot to system once before installing!"
 	fi
 	abort "Aborting..."
 fi
@@ -262,14 +260,8 @@ ui_print "Current snapshot state: $snapshot_status"
 if [ "$snapshot_status" != "none" ]; then
 	ui_print " "
 	ui_print "Seems like you just installed a rom update."
-	if [ "$snapshot_status" == "merging" ]; then
-		ui_print "Please use the rom for a while to wait for"
-		ui_print "the system to complete the snapshot merge."
-		ui_print "It's also possible to use the \"Merge Snapshots\" feature"
-		ui_print "in TWRP's Advanced menu to instantly merge snapshots."
-	else
-		ui_print "Please try to reboot to system once before installing!"
-	fi
+	ui_print "Please use the \"Merge Snapshots\" feature in TWRP's"
+	ui_print "advanced menu first to merge snapshots immediately."
 	abort "Aborting..."
 fi
 unset rc snapshot_status
@@ -480,10 +472,12 @@ if ${is_hyperos_fw}; then
 	if ${is_oss_kernel_rom} || ${is_aospa_rom} || [ -f /vendor/bin/sensor-notifier ]; then
 		use_oss_msm_drm=true
 		skip_option_oss_msm_drm=true
+	elif ! ${is_miui_rom}; then  # For roms ported from other OS
+		skip_option_oss_msm_drm=true
 	fi
 	if ! ${skip_option_oss_msm_drm}; then
 		if keycode_select \
-		    "Using open source display drivers?" \
+		    "Use open source display drivers?" \
 		    " " \
 		    "Note:" \
 		    "Select No if you don't know what this means."; then
@@ -491,10 +485,7 @@ if ${is_hyperos_fw}; then
 		fi
 	fi
 	if ${use_oss_msm_drm}; then
-		oss_msm_drm=${home}/_alt/OSS-msm_drm.ko
-		[ -f $oss_msm_drm ] || abort "! Cannot found ${oss_msm_drm}!"
-		cp $oss_msm_drm ${home}/_vendor_dlkm_modules/msm_drm.ko -f
-		unset oss_msm_drm
+		cp -f ${home}/_alt/OSS-msm_drm.ko ${home}/_vendor_dlkm_modules/msm_drm.ko
 	fi
 	unset use_oss_msm_drm skip_option_oss_msm_drm
 fi
@@ -503,9 +494,13 @@ fi
 if ${is_hyperos_fw}; then
 	use_oss_ir_driver=false
 	skip_option_oss_ir_driver=false
-	if ${is_miui_rom} || [ -f /vendor/bin/hw/android.hardware.ir@1.0-service ]; then
+	if ${is_miui_rom}; then
+		skip_option_oss_ir_driver=true
+	elif [ -f /vendor/bin/hw/android.hardware.ir@* ]; then
+		ui_print " " "- Detected Xiaomi stock IR HAL. Use stock IR driver."
 		skip_option_oss_ir_driver=true
 	elif [ -f /vendor/bin/hw/android.hardware.ir-service.xiaomi ]; then
+		ui_print " " "- Detected Lineage OSS IR HAL. Use OSS IR driver."
 		use_oss_ir_driver=true
 		skip_option_oss_ir_driver=true
 	fi
@@ -516,7 +511,7 @@ if ${is_hyperos_fw}; then
 		    "Note:" \
 		    "Select Yes if you are using AOSP rom and find that" \
 		    "IR does not working properly." \
-		    "Select No if you are using MIUI/HyperOS/AOSPA rom."; then
+		    "Select No if you are using MIUI/HyperOS rom."; then
 			use_oss_ir_driver=true
 		fi
 	fi
@@ -527,8 +522,8 @@ if ${is_hyperos_fw}; then
 fi
 
 # OSS zram.ko & zsmalloc.ko
-use_stock_zram_mods=false
 if ${is_miui_rom}; then
+	use_stock_zram_mods=false
 	if keycode_select \
 	    "Use Xiaomi's stock zram kernel modules?" \
 	    " " \
@@ -541,12 +536,12 @@ if ${is_miui_rom}; then
 	    "Select No to use OSS zram kernel modules."; then
 		use_stock_zram_mods=true
 	fi
+	if ${use_stock_zram_mods}; then
+		cp -f ${home}/_alt/MI-zram.ko ${home}/_vendor_dlkm_modules/zram.ko
+		cp -f ${home}/_alt/MI-zsmalloc.ko ${home}/_vendor_dlkm_modules/zsmalloc.ko
+	fi
+	unset use_stock_zram_mods
 fi
-if ${use_stock_zram_mods}; then
-	cp -f ${home}/_alt/MI-zram.ko ${home}/_vendor_dlkm_modules/zram.ko
-	cp -f ${home}/_alt/MI-zsmalloc.ko ${home}/_vendor_dlkm_modules/zsmalloc.ko
-fi
-unset use_stock_zram_mods
 
 unset vendor_dlkm_modules_options_file
 
@@ -628,10 +623,10 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 			touch ${home}/do_backup_flag
 
 			if ! $BOOTMODE && [ ! -d /twres ]; then
-				ui_print "======================================================================"
-				ui_print "! Warning: Please transfer the backup file you just generated"
-				ui_print "! to another device via ADB, as it will be lost after reboot!"
-				ui_print "======================================================================"
+				ui_print "============================================================"
+				ui_print "! Warning: Please transfer the backup file just generated to"
+				ui_print "! another device via ADB, as it will be lost after reboot!"
+				ui_print "============================================================"
 				ui_print " "
 				sleep 3
 			fi
@@ -791,7 +786,7 @@ fi
 
 mkdir ${home}/_dtbs
 cp ${split_img}/dtb ${home}/_dtbs/dtb
-dtb_img_splitted=`${bin}/dtp -i ${home}/_dtbs/dtb | awk '{print $NF}'` || abort "! Failed to split dtb file!"
+dtb_img_splitted=$(${bin}/dtp -i ${home}/_dtbs/dtb | awk '{print $NF}') || abort "! Failed to split dtb file!"
 ukee_dtb=
 for dtb_file in $dtb_img_splitted; do
 	if [ "$(${bin}/fdtget $dtb_file / model -ts)" == "Qualcomm Technologies, Inc. Ukee SoC" ]; then
