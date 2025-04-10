@@ -165,38 +165,40 @@ check_super_device_size() {
 copy_gpu_pwrlevels_conf() {
 	local orig_dtb=$1
 	local new_dtb=$2
+	local KGSL_NODE="/soc/qcom,kgsl-3d0@3d00000"
+	local PWRLEVELS_NODE="${KGSL_NODE}/qcom,gpu-pwrlevels"
 	local node reg gpu_freq bus_freq bus_min bus_max level cx_level acd_level initial_pwrlevel
 
 	# Clear the gpu frequency and voltage configuration of new_dtb
-	for node in $(${bin}/fdtget "$new_dtb" /soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels -l); do
-		${bin}/fdtput "$new_dtb" -r "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node"
+	for node in $(${bin}/fdtget "$new_dtb" "$PWRLEVELS_NODE" -l); do
+		${bin}/fdtput "$new_dtb" -r "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/${node}"
 	done
 
 	for node in $(${bin}/fdtget "$orig_dtb" /soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels -l | sort -r); do
 		# Read
-		      reg=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "reg" -tu)
-		 gpu_freq=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,gpu-freq" -tu)
-		 bus_freq=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-freq" -tu)
-		  bus_min=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-min" -tu)
-		  bus_max=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-max" -tu)
-		    level=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,level" -tu)
-		 cx_level=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,cx-level" -tu)
-		acd_level=$(${bin}/fdtget "$orig_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,acd-level" -tx)
+		      reg=$(${bin}/fdtget "$orig_dtb" "${PWRLEVELS_NODE}/${node}" "reg" -tu)
+		 gpu_freq=$(${bin}/fdtget "$orig_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,gpu-freq" -tu)
+		 bus_freq=$(${bin}/fdtget "$orig_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,bus-freq" -tu)
+		  bus_min=$(${bin}/fdtget "$orig_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,bus-min" -tu)
+		  bus_max=$(${bin}/fdtget "$orig_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,bus-max" -tu)
+		    level=$(${bin}/fdtget "$orig_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,level" -tu)
+		 cx_level=$(${bin}/fdtget "$orig_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,cx-level" -tu)
+		acd_level=$(${bin}/fdtget "$orig_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,acd-level" -tx)
 
 		# Write
-		${bin}/fdtput "$new_dtb" -c "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node"
-		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,cx-level"  "$cx_level" -tu
-		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,acd-level" "$acd_level" -tx
-		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-max"   "$bus_max" -tu
-		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-min"   "$bus_min" -tu
-		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,bus-freq"  "$bus_freq" -tu
-		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,level"     "$level" -tu
-		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "qcom,gpu-freq"  "$gpu_freq" -tu
-		${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000/qcom,gpu-pwrlevels/$node" "reg" "$reg" -tu
+		${bin}/fdtput "$new_dtb" -c "${PWRLEVELS_NODE}/${node}"
+		${bin}/fdtput "$new_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,cx-level"  "$cx_level" -tu
+		${bin}/fdtput "$new_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,acd-level" "$acd_level" -tx
+		${bin}/fdtput "$new_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,bus-max"   "$bus_max" -tu
+		${bin}/fdtput "$new_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,bus-min"   "$bus_min" -tu
+		${bin}/fdtput "$new_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,bus-freq"  "$bus_freq" -tu
+		${bin}/fdtput "$new_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,level"     "$level" -tu
+		${bin}/fdtput "$new_dtb" "${PWRLEVELS_NODE}/${node}" "qcom,gpu-freq"  "$gpu_freq" -tu
+		${bin}/fdtput "$new_dtb" "${PWRLEVELS_NODE}/${node}" "reg" "$reg" -tu
 	done
 
-	initial_pwrlevel=$(${bin}/fdtget "$orig_dtb" /soc/qcom,kgsl-3d0@3d00000 "qcom,initial-pwrlevel" -tu)
-	${bin}/fdtput "$new_dtb" "/soc/qcom,kgsl-3d0@3d00000" "qcom,initial-pwrlevel" "$initial_pwrlevel" -tu
+	initial_pwrlevel=$(${bin}/fdtget "$orig_dtb" "$KGSL_NODE" "qcom,initial-pwrlevel" -tu)
+	${bin}/fdtput "$new_dtb" "$KGSL_NODE" "qcom,initial-pwrlevel" "$initial_pwrlevel" -tu
 }
 
 # Check firmware
@@ -337,7 +339,11 @@ if ${exist_ksu_lkm}; then
 		ui_print "- Oh brother, it's crazy!"
 		sleep 3
 	fi
-elif keycode_select "Choose whether to install KernelSU support."; then
+elif keycode_select "Choose whether to install KernelSU support." \
+    " " \
+    "Note:" \
+    "You can use either the official KernelSU manager" \
+    "app or MKSU."; then
 	if [ "$magisk_patched" -eq 1 ]; then
 		ui_print "- Magisk detected!"
 		ui_print "- We don't recommend using Magisk and KernelSU at the same time!"
@@ -523,24 +529,17 @@ fi
 
 # OSS zram.ko & zsmalloc.ko
 if ${is_miui_rom}; then
-	use_stock_zram_mods=false
-	if keycode_select \
-	    "Use Xiaomi's stock zram kernel modules?" \
+	if ! keycode_select \
+	    "Use open source zram kernel modules??" \
 	    " " \
 	    "Note:" \
-	    "The stock zram kernel modules has specific" \
-	    "optimizations for MIUI/HyperOS roms, while the OSS" \
-	    "zram kernel modules is more stable." \
-	    " " \
-	    "Select Yes to use stock zram kernel modules." \
-	    "Select No to use OSS zram kernel modules."; then
-		use_stock_zram_mods=true
-	fi
-	if ${use_stock_zram_mods}; then
+	    "Using the open source zram kernel modules means" \
+	    "giving up Xiaomi's special optimizations of" \
+	    "zram for MIUI/HyperOS roms." \
+	    "Select No if you don't know what this means."; then
 		cp -f ${home}/_alt/MI-zram.ko ${home}/_vendor_dlkm_modules/zram.ko
 		cp -f ${home}/_alt/MI-zsmalloc.ko ${home}/_vendor_dlkm_modules/zsmalloc.ko
 	fi
-	unset use_stock_zram_mods
 fi
 
 unset vendor_dlkm_modules_options_file
