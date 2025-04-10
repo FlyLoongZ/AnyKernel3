@@ -186,7 +186,7 @@ def main_multi(build_version):
                         f1.read().replace("@SHA1_STOCK@", sha1_image_stock).replace("@SHA1_KSU@", sha1_image_ksu)
                     )
             zip_file = make_zip(
-                "META-INF", "tools", "bs_patches",
+                "META-INF", "tools", "bs_patches", "langs",
                 temp_mods_miui_7z, temp_mods_hos_7z, temp_dtb_7z, temp_image_7z, temp_ak_sh,
                 "_restore_anykernel.sh", "_rollback_anykernel.sh",
                 "LICENSE", "banner",

@@ -36,6 +36,13 @@ split_boot # skip ramdisk unpack
 
 ########## FLASH BOOT & VENDOR_DLKM START ##########
 
+. ${home}/langs/en.lang
+if ${BOOTMODE}; then
+	if [ "$(getprop ro.product.locale.language)" == "zh" ] || [ "$(getprop persist.sys.locale)" == "zh-CN" ]; then
+		. ${home}/langs/cn.lang
+	fi
+fi
+
 SHA1_STOCK="@SHA1_STOCK@"
 SHA1_KSU="@SHA1_KSU@"
 
@@ -79,7 +86,7 @@ apply_patch() {
 	file_sha1=$(sha1 $src_path)
 	[ "$file_sha1" == "$dst_sha1" ] && return 0
 	[ "$file_sha1" == "$src_sha1" ] && ${bin}/bspatch "$src_path" "$src_path" "$bs_patch"
-	[ "$(sha1 $src_path)" == "$dst_sha1" ] || abort "! Failed to patch $src_path!"
+	[ "$(sha1 $src_path)" == "$dst_sha1" ] || abort "! $_LANG_FAILED_TO_PATCH $src_path!"
 }
 
 get_keycheck_result() {
@@ -111,15 +118,15 @@ keycode_select() {
 		shift
 	done
 	ui_print "#"
-	ui_print "# Vol+ = Yes, Vol- = No."
-	ui_print "# Please press the key..."
+	ui_print "# $_LANG_KEYCHECK_PROMPT_1"
+	ui_print "# $_LANG_KEYCHECK_PROMPT_2"
 	get_keycheck_result
 	r_keycode=$?
 	ui_print "#"
 	if [ "$r_keycode" -eq "0" ]; then
-		ui_print "- You chose Yes."
+		ui_print "- $_LANG_KEYCHECK_RESULT_YES"
 	else
-		ui_print "- You chose No."
+		ui_print "- $_LANG_KEYCHECK_RESULT_NO"
 	fi
 	ui_print " "
 	return $r_keycode
@@ -151,14 +158,14 @@ check_super_device_size() {
 	local block_device_size block_device_size_lp
 
 	block_device_size=$(get_size /dev/block/by-name/super) || \
-		abort "! Failed to get super block device size (by blockdev)!"
+		abort "! $_LANG_FAILED_TO_GET_SUPER_SIZE_BLKDEV"
 	block_device_size_lp=$(${bin}/lpdump 2>/dev/null | grep -m1 -E 'Size: [[:digit:]]+ bytes$' | awk '{print $2}') || \
-		abort "! Failed to get super block device size (by lpdump)!"
-	ui_print "- Super block device size:"
-	ui_print "  - Read by blockdev: $block_device_size"
-	ui_print "  - Read by lpdump: $block_device_size_lp"
+		abort "! $_LANG_FAILED_TO_GET_SUPER_SIZE_LPDUMP"
+	ui_print "- ${_LANG_SUPER_SIZE}:"
+	ui_print "  - ${_LANG_SUPER_SIZE_BLKDEV}: $block_device_size"
+	ui_print "  - ${_LANG_SUPER_SIZE_LPDUMP}: $block_device_size_lp"
 	[ "$block_device_size" == "9663676416" ] && [ "$block_device_size_lp" == "9663676416" ] || \
-		abort "! Super block device size mismatch!"
+		abort "! $_LANG_SUPER_SIZE_MISMATCH"
 }
 
 # copy_gpu_pwrlevels_conf <orig dtb file> <new dtb file>
@@ -203,7 +210,7 @@ copy_gpu_pwrlevels_conf() {
 
 # Check firmware
 if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'; then
-	ui_print "HyperOS firmware detected!"
+	ui_print "$_LANG_HOS_FIRMWARE_DETECTED"
 	is_hyperos_fw=true
 	is_hyperos_fw_with_new_adsp2=false
 	if is_mounted /vendor/firmware_mnt && [ -d /vendor/firmware_mnt/image ]; then
@@ -218,13 +225,13 @@ if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'
 		if [ -z "$modem_mount_path" ]; then
 			mkdir ${home}/_modem_mnt
 			mount /dev/block/bootdevice/by-name/modem${slot} ${home}/_modem_mnt -o ro || \
-				abort "! Failed to mount modem partition!"
+				abort "! $_LANG_FAILED_TO_MOUNT modem partition!"
 			modem_mount_path=${home}/_modem_mnt
 		fi
 	fi
 
 	if strings "${modem_mount_path}/image/adsp2.b18" | grep -q 'audiostatus'; then
-		ui_print "Upgraded adsp2 firmware detected!"
+		ui_print "$_LANG_NEW_ADSP2_FIRMWARE_DETECTED"
 		is_hyperos_fw_with_new_adsp2=true
 	fi
 
@@ -235,7 +242,7 @@ if strings /dev/block/bootdevice/by-name/xbl_config${slot} | grep -q 'led_blink'
 
 	unset modem_mount_path
 else
-	ui_print "MIUI14 firmware detected!"
+	ui_print "$_LANG_MIUI14_FIRMWARE_DETECTED"
 	is_hyperos_fw=false
 fi
 
@@ -249,22 +256,22 @@ ${bin}/snapshotupdater_static dump &>/dev/null
 rc=$?
 if [ "$rc" != 0 ]; then
 	ui_print " "
-	ui_print "Cannot get snapshot status via snapshotupdater_static! rc=$rc."
+	ui_print "$_LANG_FAILED_TO_GET_SNAPSHOT_STATUS rc=$rc."
 	if ${BOOTMODE}; then
-		ui_print "If you are installing the kernel in an app, try using another app."
-		ui_print "Recommend KernelFlasher:"
-		ui_print "  https://github.com/capntrips/KernelFlasher/releases"
+		ui_print "$_LANG_FAILED_TO_GET_SNAPSHOT_STATUS_PROMPT_1"
+		ui_print "$_LANG_FAILED_TO_GET_SNAPSHOT_STATUS_PROMPT_2"
+		ui_print "$_LANG_FAILED_TO_GET_SNAPSHOT_STATUS_PROMPT_3"
 	fi
-	abort "Aborting..."
+	abort "$_LANG_ABORTING"
 fi
 snapshot_status=$(${bin}/snapshotupdater_static dump 2>/dev/null | grep '^Update state:' | awk '{print $3}')
-ui_print "Current snapshot state: $snapshot_status"
+ui_print "${_LANG_CURRENT_SNAPSHOT_STATUS}: $snapshot_status"
 if [ "$snapshot_status" != "none" ]; then
 	ui_print " "
-	ui_print "Seems like you just installed a rom update."
-	ui_print "Please use the \"Merge Snapshots\" feature in TWRP's"
-	ui_print "advanced menu first to merge snapshots immediately."
-	abort "Aborting..."
+	ui_print "$_LANG_CURRENT_SNAPSHOT_STATUS_PROMPT_1"
+	ui_print "$_LANG_CURRENT_SNAPSHOT_STATUS_PROMPT_2"
+	ui_print "$_LANG_CURRENT_SNAPSHOT_STATUS_PROMPT_3"
+	abort "$_LANG_ABORTING"
 fi
 unset rc snapshot_status
 
@@ -272,20 +279,20 @@ unset rc snapshot_status
 is_miui_rom=false
 is_aospa_rom=false
 is_oss_kernel_rom=false
-if [ -f /system/framework/MiuiBooster.jar ] && keycode_select "Is your current rom MIUI/HyperOS? (I guess yes)"; then
+if [ -f /system/framework/MiuiBooster.jar ] && keycode_select "$_LANG_GUESS_ROM_MIUI"; then
 	is_miui_rom=true
-elif cat /system/build.prop | grep -qi 'aospa' && keycode_select "Is your current rom AOSPA? (I guess yes)"; then
+elif cat /system/build.prop | grep -qi 'aospa' && keycode_select "$_LANG_GUESS_ROM_AOSPA"; then
 	is_aospa_rom=true
-elif keycode_select "Is your rom originally based on OSS kernel?"; then
+elif keycode_select "$_LANG_GUESS_ROM_OSS_KERNEL"; then
 	is_oss_kernel_rom=true
 fi
 
-[ -f ${home}/Image.7z ] || abort "! Cannot found ${home}/Image.7z!"
+[ -f ${home}/Image.7z ] || abort "! $_LANG_CANNOT_FOUND ${home}/Image.7z!"
 ui_print " "
-ui_print "- Unpacking kernel image..."
-${bin}/7za x ${home}/Image.7z -o${home}/ && [ -f ${home}/Image ] || abort "! Failed to unpack ${home}/Image.7z!"
+ui_print "- $_LANG_UNPACKING_KERNEL_IMAGE"
+${bin}/7za x ${home}/Image.7z -o${home}/ && [ -f ${home}/Image ] || abort "! $_LANG_FAILED_TO_UNPACK ${home}/Image.7z!"
 rm ${home}/Image.7z
-[ "$(sha1 ${home}/Image)" == "$SHA1_STOCK" ] || abort "! Kernel image is corrupted!"
+[ "$(sha1 ${home}/Image)" == "$SHA1_STOCK" ] || abort "! $_LANG_KERNEL_IMAGE_CORRUPTED"
 
 strings ${home}/Image 2>/dev/null | grep -E -m1 'Linux version.*#' > ${home}/vertmp
 
@@ -293,7 +300,7 @@ strings ${home}/Image 2>/dev/null | grep -E -m1 'Linux version.*#' > ${home}/ver
 [ -d /vendor_dlkm ] || mkdir /vendor_dlkm
 is_mounted /vendor_dlkm || \
 	mount /vendor_dlkm -o ro || mount /dev/block/mapper/vendor_dlkm${slot} /vendor_dlkm -o ro || \
-		abort "! Failed to mount /vendor_dlkm"
+		abort "! $_LANG_FAILED_TO_MOUNT /vendor_dlkm"
 
 do_backup_flag=false
 if [ ! -f /vendor_dlkm/lib/modules/vertmp ]; then
@@ -306,52 +313,52 @@ fi
 $BOOTMODE || umount /vendor_dlkm
 
 # KernelSU
-[ -f ${split_img}/ramdisk.cpio ] || abort "! Cannot found ramdisk.cpio!"
+[ -f ${split_img}/ramdisk.cpio ] || abort "! $_LANG_CANNOT_FOUND ramdisk.cpio!"
 ${bin}/magiskboot cpio ${split_img}/ramdisk.cpio test
 magisk_patched=$?
 exist_ksu_lkm=false
 if ${bin}/magiskboot cpio ${split_img}/ramdisk.cpio "exists kernelsu.ko"; then
 	${bin}/magiskboot cpio ${split_img}/ramdisk.cpio "extract kernelsu.ko ${home}/kernelsu.ko" || \
-		abort "! Failed to extract kernelsu.ko!"
+		abort "! $_LANG_FAILED_TO_EXTRACT kernelsu.ko!"
 	if strings ${home}/kernelsu.ko | grep -q 'clang version 12.0.5'; then
 		exist_ksu_lkm=true
 	else
-		ui_print "- Detected KernelSU LKM incompatible with GKI."
-		ui_print "- Uninstalling KernelSU LKM..."
+		ui_print "- $_LANG_DETECTED_INCOMPATIBLE_KSU_LKM"
+		ui_print "- $_LANG_UNINSTALLING_KSU_LKM"
 		# TODO: chomd init
 		if ${bin}/magiskboot cpio ${split_img}/ramdisk.cpio \
 		    "rm kernelsu.ko" \
 		    "rm init" \
 		    "mv init.real init"; then
-			ui_print "- Successfully uninstalled KernelSU LKM!"
+			ui_print "- $_LANG_UNINSTALLING_KSU_LKM_SUCCESS"
 			sleep 3
 		else
-			abort "! Failed to uninstall KernelSU LKM!"
+			abort "! $_LANG_UNINSTALLING_KSU_LKM_FAILED"
 		fi
 	fi
 	rm ${home}/kernelsu.ko
 fi
 if ${exist_ksu_lkm}; then
-	ui_print "- KernelSU LKM detected!"
-	ui_print "- Then you can only install Melt Kernel without KernelSU support!"
+	ui_print "- $_LANG_DETECTED_COMPATIBLE_KSU_LKM_PROMPT_1"
+	ui_print "- $_LANG_DETECTED_COMPATIBLE_KSU_LKM_PROMPT_2"
 	if [ "$magisk_patched" -eq 1 ]; then
-		ui_print "- Magisk detected!"
-		ui_print "- Oh brother, it's crazy!"
+		ui_print "- $_LANG_DETECTED_COMPATIBLE_KSU_LKM_WITH_MAGISK_PROMPT_1"
+		ui_print "- $_LANG_DETECTED_COMPATIBLE_KSU_LKM_WITH_MAGISK_PROMPT_2"
 		sleep 3
 	fi
-elif keycode_select "Choose whether to install KernelSU support." \
+elif keycode_select "$_LANG_SELECT_KSU" \
     " " \
-    "Note:" \
-    "You can use either the official KernelSU manager" \
-    "app or MKSU."; then
+    "$_LANG_NOTES" \
+    "$_LANG_SELECT_KSU_PROMPT_1" \
+    "$_LANG_SELECT_KSU_PROMPT_2"; then
 	if [ "$magisk_patched" -eq 1 ]; then
-		ui_print "- Magisk detected!"
-		ui_print "- We don't recommend using Magisk and KernelSU at the same time!"
-		ui_print "- If any problems occur, it's your own responsibility!"
+		ui_print "- $_LANG_DETECTED_KSU_IMG_WITH_MAGISK_PROMPT_1"
+		ui_print "- $_LANG_DETECTED_KSU_IMG_WITH_MAGISK_PROMPT_2"
+		ui_print "- $_LANG_DETECTED_KSU_IMG_WITH_MAGISK_PROMPT_3"
 		ui_print " "
 		sleep 3
 	fi
-	ui_print "- Patching Kernel image..."
+	ui_print "- $_LANG_PATCHING Kernel image..."
 	apply_patch ${home}/Image "$SHA1_STOCK" "$SHA1_KSU" ${home}/bs_patches/ksu.p
 fi
 unset exist_ksu_lkm
@@ -361,15 +368,15 @@ export magisk_patched
 $BOOTMODE || setenforce 0
 
 ui_print " "
-ui_print "- Unpacking kernel modules..."
+ui_print "- $_LANG_UNPACKING_KERNEL_MODULES"
 if ${is_hyperos_fw}; then
 	modules_pkg=${home}/_modules_hyperos.7z
 else
 	modules_pkg=${home}/_modules_miui.7z
 fi
-[ -f $modules_pkg ] || abort "! Cannot found ${modules_pkg}!"
+[ -f $modules_pkg ] || abort "! $_LANG_CANNOT_FOUND ${modules_pkg}!"
 ${bin}/7za x $modules_pkg -o${home}/ && [ -d ${home}/_vendor_boot_modules ] && [ -d ${home}/_vendor_dlkm_modules ] || \
-	abort "! Failed to unpack ${modules_pkg}!"
+	abort "! $_LANG_FAILED_TO_UNPACK ${modules_pkg}!"
 if ${is_hyperos_fw} && ${is_hyperos_fw_with_new_adsp2}; then
 	cp -f ${home}/_alt/NEW-qti_battery_charger_main.ko       ${home}/_vendor_dlkm_modules/qti_battery_charger_main.ko
 	cp -f ${home}/_alt/NEW-qti_battery_charger_main-STOCK.ko ${home}/_vendor_boot_modules/qti_battery_charger_main.ko
@@ -382,8 +389,8 @@ vendor_dlkm_modules_options_file=${home}/_vendor_dlkm_modules/modules.options
 # xiaomi_touch.ko
 if ${is_hyperos_fw} && [ -f /vendor/bin/hw/vendor.lineage.touch@* ]; then
 	ui_print " "
-	ui_print "- Detected Lineage OSS xiaomi touch HAL."
-	ui_print "- Use the alternative touchscreen modules."
+	ui_print "- $_LANG_DETECTED_OSS_XIAOMI_TOUCH_PROMPT_1"
+	ui_print "- $_LANG_DETECTED_OSS_XIAOMI_TOUCH_PROMPT_2"
 	cp -f ${home}/_alt/xiaomi_touch_los/* ${home}/_vendor_dlkm_modules/
 	sed -i \
 	    's/\/vendor\/lib\/modules\/xiaomi_touch\.ko:/\/vendor\/lib\/modules\/xiaomi_touch\.ko:\ \/vendor\/lib\/modules\/panel_event_notifier\.ko/g' \
@@ -392,11 +399,11 @@ fi
 
 # goodix_core.ko
 if keycode_select \
-    "Always enable 360HZ touch sampling rate?" \
+    "$_LANG_SELECT_360HZ" \
     " " \
-    "Note:" \
-    "Always enabling 360HZ will NOT improve the daily" \
-    "use experience and increase power consumption."; then
+    "$_LANG_NOTES" \
+    "$_LANG_SELECT_360HZ_PROMPT_1" \
+    "$_LANG_SELECT_360HZ_PROMPT_2"; then
 	echo "options goodix_core force_high_report_rate=y" >> $vendor_dlkm_modules_options_file
 fi
 
@@ -409,11 +416,11 @@ fi
 
 qti_battery_charger_mod_options=""
 if keycode_select \
-    "Make device show more realistic battery percentage?" \
+    "$_LANG_SELECT_REAL_BATTERY" \
     " " \
-    "Note:" \
-    "This will sometimes make it difficult to charge" \
-    "the device to 100%."; then
+    "$_LANG_NOTES" \
+    "$_LANG_SELECT_REAL_BATTERY_PROMPT_1" \
+    "$_LANG_SELECT_REAL_BATTERY_PROMPT_2"; then
 	qti_battery_charger_mod_options="${qti_battery_charger_mod_options} report_real_capacity=y"
 fi
 
@@ -427,11 +434,11 @@ elif ${is_miui_rom} || ${is_aospa_rom}; then
 fi
 if ! ${skip_option_fix_battery_usage}; then
 	if keycode_select \
-	    "Fix battery usage issue?" \
+	    "$_LANG_SELECT_FIX_BATTERY_USAGE" \
 	    " " \
-	    "Note:" \
-	    "Select Yes if you find that the battery usage data" \
-	    "in the system settings is not displayed."; then
+	    "$_LANG_NOTES" \
+	    "$_LANG_SELECT_FIX_BATTERY_USAGE_PROMPT_1" \
+	    "$_LANG_SELECT_FIX_BATTERY_USAGE_PROMPT_2"; then
 		do_fix_battery_usage=true
 	fi
 fi
@@ -457,12 +464,12 @@ elif ${is_oss_kernel_rom} || ${is_aospa_rom}; then
 fi
 if ! ${skip_option_wired_btn_altmode}; then
 	if keycode_select \
-	    "Use alternative wired headset buttons mode?" \
+	    "$_LANG_SELECT_WIRED_BTN_ALTMODE" \
 	    " " \
-	    "Note:" \
-	    "Select Yes if you find that the volume buttons on" \
-	    "your wired headset are not working properly." \
-	    "Select No if you are using MIUI/HyperOS rom."; then
+	    "$_LANG_NOTES" \
+	    "$_LANG_SELECT_WIRED_BTN_ALTMODE_PROMPT_1" \
+	    "$_LANG_SELECT_WIRED_BTN_ALTMODE_PROMPT_2" \
+	    "$_LANG_SELECT_WIRED_BTN_ALTMODE_PROMPT_3"; then
 		use_wired_btn_altmode=true
 	fi
 fi
@@ -483,10 +490,10 @@ if ${is_hyperos_fw}; then
 	fi
 	if ! ${skip_option_oss_msm_drm}; then
 		if keycode_select \
-		    "Use open source display drivers?" \
+		    "$_LANG_SELECT_OSS_MSM_DRM" \
 		    " " \
-		    "Note:" \
-		    "Select No if you don't know what this means."; then
+		    "$_LANG_NOTES" \
+		    "$_LANG_SELECT_OSS_MSM_DRM_PROMPT_1"; then
 			use_oss_msm_drm=true
 		fi
 	fi
@@ -503,21 +510,21 @@ if ${is_hyperos_fw}; then
 	if ${is_miui_rom}; then
 		skip_option_oss_ir_driver=true
 	elif [ -f /vendor/bin/hw/android.hardware.ir@* ]; then
-		ui_print " " "- Detected Xiaomi stock IR HAL. Use stock IR driver."
+		ui_print " " "- $_LANG_IR_HAL_XIAOMI"
 		skip_option_oss_ir_driver=true
 	elif [ -f /vendor/bin/hw/android.hardware.ir-service.xiaomi ]; then
-		ui_print " " "- Detected Lineage OSS IR HAL. Use OSS IR driver."
+		ui_print " " "- $_LANG_IR_HAL_LOS_OSS"
 		use_oss_ir_driver=true
 		skip_option_oss_ir_driver=true
 	fi
 	if ! ${skip_option_oss_ir_driver}; then
 		if keycode_select \
-		    "Use open source IR driver?" \
+		    "$_LANG_SELECT_OSS_IR" \
 		    " " \
-		    "Note:" \
-		    "Select Yes if you are using AOSP rom and find that" \
-		    "IR does not working properly." \
-		    "Select No if you are using MIUI/HyperOS rom."; then
+		    "$_LANG_NOTES" \
+		    "$_LANG_SELECT_OSS_IR_PROMPT_1" \
+		    "$_LANG_SELECT_OSS_IR_PROMPT_2" \
+		    "$_LANG_SELECT_OSS_IR_PROMPT_3"; then
 			use_oss_ir_driver=true
 		fi
 	fi
@@ -530,13 +537,13 @@ fi
 # OSS zram.ko & zsmalloc.ko
 if ${is_miui_rom}; then
 	if ! keycode_select \
-	    "Use open source zram kernel modules??" \
+	    "$_LANG_SELECT_OSS_ZRAM" \
 	    " " \
-	    "Note:" \
-	    "Using the open source zram kernel modules means" \
-	    "giving up Xiaomi's special optimizations of" \
-	    "zram for MIUI/HyperOS roms." \
-	    "Select No if you don't know what this means."; then
+	    "$_LANG_NOTES" \
+	    "$_LANG_SELECT_OSS_ZRAM_PROMPT_1" \
+	    "$_LANG_SELECT_OSS_ZRAM_PROMPT_2" \
+	    "$_LANG_SELECT_OSS_ZRAM_PROMPT_3" \
+	    "$_LANG_SELECT_OSS_ZRAM_PROMPT_4"; then
 		cp -f ${home}/_alt/MI-zram.ko ${home}/_vendor_dlkm_modules/zram.ko
 		cp -f ${home}/_alt/MI-zsmalloc.ko ${home}/_vendor_dlkm_modules/zsmalloc.ko
 	fi
@@ -547,13 +554,13 @@ unset vendor_dlkm_modules_options_file
 # Disguised the GPU model as Adreno730v3
 disguised_adreno730=false
 if keycode_select \
-    "Disguised the GPU model as Adreno730?" \
+    "$_LANG_SELECT_DISGUISED_ADRENO730" \
     " " \
-    "Note:" \
-    "The GPU model of Snapdragon 8+ Gen1 is Adreno730." \
-    "Disguising the GPU model as Adreno730 may unlock" \
-    "higher image quality and frame rate in some mobile" \
-    "games, but the side effects are unknown."; then
+    "$_LANG_NOTES" \
+    "$_LANG_SELECT_DISGUISED_ADRENO730_PROMPT_1" \
+    "$_LANG_SELECT_DISGUISED_ADRENO730_PROMPT_2" \
+    "$_LANG_SELECT_DISGUISED_ADRENO730_PROMPT_3" \
+    "$_LANG_SELECT_DISGUISED_ADRENO730_PROMPT_4"; then
 	disguised_adreno730=true
 fi
 
@@ -573,11 +580,11 @@ if ! ${is_miui_rom}; then
 fi
 
 if ! keycode_select \
-    "This is the last option." \
+    "$_LANG_SELECT_LAST" \
     " " \
-    "Select Yes to start the installation." \
-    "Select No to exit the installer."; then
-	abort "Abort by user."
+    "$_LANG_SELECT_LAST_PROMPT_1" \
+    "$_LANG_SELECT_LAST_PROMPT_2"; then
+	abort "$_LANG_SELECT_LAST_ABORT"
 fi
 
 ui_print " "
@@ -591,11 +598,11 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 
 	# Backup kernel and vendor_dlkm image
 	if ${do_backup_flag}; then
-		ui_print "- It looks like you are installing Melt Kernel for the first time."
+		ui_print "- $_LANG_BACKUP_KERNEL_NOTE"
 
-		if keycode_select "Backup the current kernel?"; then
-			ui_print "- Backing up kernel, vendor_boot, vendor_dlkm"
-			ui_print "  and dtbo partition..."
+		if keycode_select "$_LANG_SELECT_BACKUP_KERNEL"; then
+			ui_print "- $_LANG_BACKUP_KERNEL_DOING_PROMPT_1"
+			ui_print "  $_LANG_BACKUP_KERNEL_DOING_PROMPT_2"
 
 			backup_package=/sdcard/Melt-restore-kernel-$(file_getprop /system/build.prop ro.build.version.incremental)-$(date +"%Y%m%d-%H%M%S").zip
 
@@ -612,12 +619,12 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 			sync
 
 			ui_print " "
-			ui_print "- The current kernel, vendor_boot, vendor_dlkm"
-			ui_print "  and dtbo have been backedup to:"
+			ui_print "- $_LANG_BACKUP_KERNEL_DONE_PROMPT_1"
+			ui_print "  $_LANG_BACKUP_KERNEL_DONE_PROMPT_2"
 			ui_print "  $backup_package"
-			ui_print "- If you encounter an unexpected situation,"
-			ui_print "  or want to restore the stock kernel,"
-			ui_print "  please flash it in TWRP or some supported apps."
+			ui_print "- $_LANG_BACKUP_KERNEL_DONE_PROMPT_3"
+			ui_print "  $_LANG_BACKUP_KERNEL_DONE_PROMPT_4"
+			ui_print "  $_LANG_BACKUP_KERNEL_DONE_PROMPT_5"
 			ui_print " "
 			touch ${home}/do_backup_flag
 
@@ -634,7 +641,7 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 		fi
 	fi
 
-	ui_print "- Unpacking /vendor_dlkm partition..."
+	ui_print "- $_LANG_VENDOR_DLKM_UNPACKING"
 	extract_vendor_dlkm_dir=${home}/_extract_vendor_dlkm
 	mkdir -p $extract_vendor_dlkm_dir
 	vendor_dlkm_is_ext4=false
@@ -642,43 +649,43 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 	sync
 
 	if ${vendor_dlkm_is_ext4}; then
-		ui_print "- /vendor_dlkm seems to be in ext4 file system."
+		ui_print "- $_LANG_VENDOR_DLKM_IS_EXT4"
 		mount ${home}/vendor_dlkm.img $extract_vendor_dlkm_dir -o ro -t ext4 || \
-			abort "! Unsupported file system!"
+			abort "! $_LANG_VENDOR_DLKM_UNSUPPORTED"
 		vendor_dlkm_full_space=$(df -B1 | grep -E "[[:space:]]$extract_vendor_dlkm_dir\$" | awk '{print $2}')
 		vendor_dlkm_used_space=$(df -B1 | grep -E "[[:space:]]$extract_vendor_dlkm_dir\$" | awk '{print $3}')
 		vendor_dlkm_free_space=$(df -B1 | grep -E "[[:space:]]$extract_vendor_dlkm_dir\$" | awk '{print $4}')
 		vendor_dlkm_stock_modules_size=$(get_size ${extract_vendor_dlkm_dir}/lib/modules)
-		ui_print "- /vendor_dlkm partition space:"
-		ui_print "  - Total space: $(bytes_to_mb $vendor_dlkm_full_space)"
-		ui_print "  - Used space:  $(bytes_to_mb $vendor_dlkm_used_space)"
-		ui_print "  - Free space:  $(bytes_to_mb $vendor_dlkm_free_space)"
+		ui_print "- ${_LANG_VENDOR_DLKM_SPACE}:"
+		ui_print "  - ${_LANG_VENDOR_DLKM_SPACE_TOTAL}: $(bytes_to_mb $vendor_dlkm_full_space)"
+		ui_print "  - ${_LANG_VENDOR_DLKM_SPACE_USED}: $(bytes_to_mb $vendor_dlkm_used_space)"
+		ui_print "  - ${_LANG_VENDOR_DLKM_SPACE_FREE}: $(bytes_to_mb $vendor_dlkm_free_space)"
 		umount $extract_vendor_dlkm_dir
 
 		vendor_dlkm_new_modules_size=$(get_size ${home}/_vendor_dlkm_modules)
 		vendor_dlkm_need_size=$((vendor_dlkm_used_space - vendor_dlkm_stock_modules_size + vendor_dlkm_new_modules_size + 10*1024*1024))
 		if [ "$vendor_dlkm_need_size" -ge "$vendor_dlkm_full_space" ]; then
 			# Resize vendor_dlkm image
-			ui_print "- /vendor_dlkm partition does not have enough free space!"
-			ui_print "- Trying to resize..."
+			ui_print "- $_LANG_VENDOR_DLKM_RESIZE_PROMPT_1"
+			ui_print "- $_LANG_VENDOR_DLKM_RESIZE_PROMPT_2"
 
 			${bin}/e2fsck -f -y ${home}/vendor_dlkm.img
 			vendor_dlkm_resized_size=$(echo $vendor_dlkm_need_size | awk '{printf "%dM", ($1 / 1024 / 1024 + 1)}')
 			${bin}/resize2fs ${home}/vendor_dlkm.img $vendor_dlkm_resized_size || \
-				abort "! Failed to resize vendor_dlkm image!"
-			ui_print "- Resized vendor_dlkm.img size: ${vendor_dlkm_resized_size}."
+				abort "! $_LANG_VENDOR_DLKM_RESIZE_FAILED"
+			ui_print "- ${_LANG_VENDOR_DLKM_RESIZED}: ${vendor_dlkm_resized_size}."
 			# e2fsck again
 			${bin}/e2fsck -f -y ${home}/vendor_dlkm.img
 
 			do_check_super_device_size=true
 			unset vendor_dlkm_resized_size
 		else
-			ui_print "- /vendor_dlkm partition has sufficient space."
+			ui_print "- $_LANG_VENDOR_DLKM_RESIZE_NO_NEED"
 		fi
 
-		ui_print "- Trying to mount vendor_dlkm image as read-write..."
+		ui_print "- $_LANG_VENDOR_DLKM_MOUNT_RW"
 		mount ${home}/vendor_dlkm.img $extract_vendor_dlkm_dir -o rw -t ext4 || \
-			abort "! Failed to mount vendor_dlkm.img as read-write!"
+			abort "! $_LANG_VENDOR_DLKM_MOUNT_RW_FAILED"
 
 		unset vendor_dlkm_full_space vendor_dlkm_used_space vendor_dlkm_free_space vendor_dlkm_stock_modules_size vendor_dlkm_new_modules_size vendor_dlkm_need_size
 		extract_vendor_dlkm_modules_dir=${extract_vendor_dlkm_dir}/lib/modules
@@ -686,10 +693,10 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 		extract_vendor_dlkm_modules_dir=${extract_vendor_dlkm_dir}/vendor_dlkm/lib/modules
 	fi
 
-	ui_print "- Updating /vendor_dlkm image..."
+	ui_print "- $_LANG_VENDOR_DLKM_UPDATEING"
 	rm -f ${extract_vendor_dlkm_modules_dir}/*
 	cp ${home}/_vendor_dlkm_modules/* ${extract_vendor_dlkm_modules_dir}/ || \
-		abort "! Failed to update modules! No enough free space?"
+		abort "! $_LANG_VENDOR_DLKM_UPDATE_FAILED"
 	cp ${home}/vertmp ${extract_vendor_dlkm_modules_dir}/vertmp
 	sync
 
@@ -702,10 +709,10 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 			echo "vendor_dlkm/lib/modules/$(basename $f) 0 0 0644" >> ${extract_vendor_dlkm_dir}/config/vendor_dlkm_fs_config
 		done
 		echo '/vendor_dlkm/lib/modules/.+ u:object_r:vendor_file:s0' >> ${extract_vendor_dlkm_dir}/config/vendor_dlkm_file_contexts
-		ui_print "- Repacking /vendor_dlkm image..."
+		ui_print "- $_LANG_VENDOR_DLKM_REPACKING"
 		rm -f ${home}/vendor_dlkm.img
 		mkfs_erofs ${extract_vendor_dlkm_dir}/vendor_dlkm ${home}/vendor_dlkm.img || \
-			abort "! Failed to repack the vendor_dlkm image!"
+			abort "! $_LANG_VENDOR_DLKM_REPACK_FAILED"
 		rm -rf ${extract_vendor_dlkm_dir}
 
 		if [ "$(get_size ${home}/vendor_dlkm.img)" -gt "$vendor_dlkm_block_size" ]; then
@@ -718,10 +725,10 @@ if true; then  # I don't want to adjust the indentation of the code block below,
 
 	if ${do_check_super_device_size}; then
 		ui_print " "
-		ui_print "- The generated image file is larger than the partition size."
-		ui_print "- Checking super partition size..."
+		ui_print "- $_LANG_SUPER_SIZE_NEED_CHECK_PROMPT_1"
+		ui_print "- $_LANG_SUPER_SIZE_NEED_CHECK_PROMPT_2"
 		check_super_device_size  # If the check here fails, it will be aborted directly.
-		ui_print "- Pass!"
+		ui_print "- $_LANG_SUPER_SIZE_NEED_CHECK_PASS"
 	fi
 
 	unset do_check_super_device_size vendor_dlkm_block_size vendor_dlkm_is_ext4 extract_vendor_dlkm_dir extract_vendor_dlkm_modules_dir
@@ -760,9 +767,9 @@ reset_ak
 # Try to fix vendor_ramdisk size and vendor_ramdisk table entry information that was corrupted by old versions of magiskboot.
 ${bin}/vendor_boot_fix "$block"
 case $? in
-	0) ui_print " " "- Successfully repaired the vendor_boot partition!";;
+	0) ui_print " " "- $_LANG_VENDOR_BOOT_FIX_SUCCESS";;
 	2) ;;  # The vendor_boot partition is normal and does not need to be repaired.
-	*) abort "! Failed to repair vendor_boot partition!";;
+	*) abort "! $_LANG_VENDOR_BOOT_FIX_FAILED";;
 esac
 
 # vendor_boot install
@@ -773,7 +780,7 @@ rm ${vendor_boot_modules_dir}/*
 cp ${home}/_vendor_boot_modules/* ${vendor_boot_modules_dir}/
 set_perm 0 0 0644 ${vendor_boot_modules_dir}/*
 
-${bin}/7za x ${home}/_dtb.7z -o${home}/ || abort "! Failed to unpack _dtb.7z!"
+${bin}/7za x ${home}/_dtb.7z -o${home}/ || abort "! $_LANG_FAILED_TO_UNPACK _dtb.7z!"
 
 if ${is_oss_kernel_rom}; then
 	mv ${home}/dtbo-1.img ${home}/dtbo.img
@@ -785,7 +792,7 @@ fi
 
 mkdir ${home}/_dtbs
 cp ${split_img}/dtb ${home}/_dtbs/dtb
-dtb_img_splitted=$(${bin}/dtp -i ${home}/_dtbs/dtb | awk '{print $NF}') || abort "! Failed to split dtb file!"
+dtb_img_splitted=$(${bin}/dtp -i ${home}/_dtbs/dtb | awk '{print $NF}') || abort "! $_LANG_DTB_SPLIT_FAILED"
 ukee_dtb=
 for dtb_file in $dtb_img_splitted; do
 	if [ "$(${bin}/fdtget $dtb_file / model -ts)" == "Qualcomm Technologies, Inc. Ukee SoC" ]; then
@@ -793,7 +800,7 @@ for dtb_file in $dtb_img_splitted; do
 		break
 	fi
 done
-[ -z "$ukee_dtb" ] && abort "! Can not found Ukee dtb file!"
+[ -z "$ukee_dtb" ] && abort "! $_LANG_DTB_NOT_FOUND_UKEE"
 
 if ${disguised_adreno730}; then
 	${bin}/fdtput ${home}/dtb "/soc/qcom,kgsl-3d0@3d00000" "qcom,gpu-model" "Adreno730v3" -ts
@@ -819,11 +826,11 @@ unset is_hyperos_fw is_miui_rom is_aospa_rom is_oss_kernel_rom is_hyperos_fw_wit
 # Patch vbmeta
 ui_print " "
 for vbmeta_blk in /dev/block/by-name/vbmeta*; do
-	ui_print "- Patching $(basename $vbmeta_blk) ..."
+	ui_print "- $_LANG_PATCHING $(basename $vbmeta_blk) ..."
 	${bin}/vbmeta-disable-verification $vbmeta_blk || {
-		ui_print "! Failed to patching ${vbmeta_blk}!"
-		ui_print "- If the device won't boot after the installation,"
-		ui_print "  please manually disable AVB in TWRP."
+		ui_print "! $_LANG_FAILED_TO_PATCH ${vbmeta_blk}!"
+		ui_print "- $_LANG_VBMETA_FAILED_PROMPT_1"
+		ui_print "  $_LANG_VBMETA_FAILED_PROMPT_2"
 	}
 done
 
