@@ -35,17 +35,6 @@ patch_vbmeta_flag=auto
 split_boot # skip ramdisk unpack
 
 ########## FLASH BOOT & VENDOR_DLKM START ##########
-
-. ${home}/langs/en.lang
-if ${BOOTMODE}; then
-	if [ "$(getprop ro.product.locale.language)" == "zh" ] || [ "$(getprop persist.sys.locale)" == "zh-CN" ]; then
-		. ${home}/langs/cn.lang
-	fi
-fi
-
-SHA1_STOCK="@SHA1_STOCK@"
-SHA1_KSU="@SHA1_KSU@"
-
 KEYCODE_UP=42
 KEYCODE_DOWN=41
 
@@ -75,20 +64,6 @@ is_mounted() { mount | grep -q " $1 "; }
 
 sha1() { ${bin}/magiskboot sha1 "$1"; }
 
-apply_patch() {
-	# apply_patch <src_path> <src_sha1> <dst_sha1> <bs_patch>
-	local src_path=$1
-	local src_sha1=$2
-	local dst_sha1=$3
-	local bs_patch=$4
-	local file_sha1
-
-	file_sha1=$(sha1 $src_path)
-	[ "$file_sha1" == "$dst_sha1" ] && return 0
-	[ "$file_sha1" == "$src_sha1" ] && ${bin}/bspatch "$src_path" "$src_path" "$bs_patch"
-	[ "$(sha1 $src_path)" == "$dst_sha1" ] || abort "! $_LANG_FAILED_TO_PATCH $src_path!"
-}
-
 get_keycheck_result() {
 	# Default behavior:
 	# - press Vol+: return true (0)
@@ -108,6 +83,19 @@ get_keycheck_result() {
 		esac
 	done
 }
+
+. ${home}/langs/en.lang
+ui_print "# 请选择语言 Please select language"
+ui_print "#"
+ui_print "# 音量键+ = 中文"
+ui_print "# Vol Down = English"
+ui_print "#"
+if get_keycheck_result; then
+	ui_print "- 你选择了中文"
+	. ${home}/langs/cn.lang
+else
+	ui_print "- You chooes English"
+fi
 
 keycode_select() {
 	local r_keycode
@@ -287,13 +275,6 @@ elif keycode_select "$_LANG_GUESS_ROM_OSS_KERNEL"; then
 	is_oss_kernel_rom=true
 fi
 
-[ -f ${home}/Image.7z ] || abort "! $_LANG_CANNOT_FOUND ${home}/Image.7z!"
-ui_print " "
-ui_print "- $_LANG_UNPACKING_KERNEL_IMAGE"
-${bin}/7za x ${home}/Image.7z -o${home}/ && [ -f ${home}/Image ] || abort "! $_LANG_FAILED_TO_UNPACK ${home}/Image.7z!"
-rm ${home}/Image.7z
-[ "$(sha1 ${home}/Image)" == "$SHA1_STOCK" ] || abort "! $_LANG_KERNEL_IMAGE_CORRUPTED"
-
 strings ${home}/Image 2>/dev/null | grep -E -m1 'Linux version.*#' > ${home}/vertmp
 
 # Check vendor_dlkm partition status
@@ -346,20 +327,6 @@ if ${exist_ksu_lkm}; then
 		ui_print "- $_LANG_DETECTED_COMPATIBLE_KSU_LKM_WITH_MAGISK_PROMPT_2"
 		sleep 3
 	fi
-elif keycode_select "$_LANG_SELECT_KSU" \
-    " " \
-    "$_LANG_NOTES" \
-    "$_LANG_SELECT_KSU_PROMPT_1" \
-    "$_LANG_SELECT_KSU_PROMPT_2"; then
-	if [ "$magisk_patched" -eq 1 ]; then
-		ui_print "- $_LANG_DETECTED_KSU_IMG_WITH_MAGISK_PROMPT_1"
-		ui_print "- $_LANG_DETECTED_KSU_IMG_WITH_MAGISK_PROMPT_2"
-		ui_print "- $_LANG_DETECTED_KSU_IMG_WITH_MAGISK_PROMPT_3"
-		ui_print " "
-		sleep 3
-	fi
-	ui_print "- $_LANG_PATCHING Kernel image..."
-	apply_patch ${home}/Image "$SHA1_STOCK" "$SHA1_KSU" ${home}/bs_patches/ksu.p
 fi
 unset exist_ksu_lkm
 export magisk_patched
